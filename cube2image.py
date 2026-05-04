@@ -73,12 +73,14 @@ class Cube2ImageGUI:
         # on colormap change, update self.colormap and redraw the plot
         self.colormap_cb.bind('<<ComboboxSelected>>', lambda e: self.change_colormap())
         
-        # Plot and Create HSI buttons in same row
-        ttk.Button(main_frame, text='Plot', command=self.update_plot).grid(row=4, column=0, columnspan=2, sticky='we')
-        ttk.Button(main_frame, text='Create HSI', command=self.createHSI).grid(row=4, column=2, columnspan=1, sticky='we')
+        # Create frame for Plot and Create HSI buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=4, column=0, columnspan=3, pady=10)
+        ttk.Button(button_frame, text='Plot', command=self.update_plot).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text='Create HSI', command=self.createHSI).pack(side=tk.LEFT, padx=5)
         
         # Matplotlib canvas
-        self.fig = Figure(figsize=(5, 4))
+        self.fig = Figure(figsize=(5, 5))
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.fig, master=main_frame)
         self.canvas.get_tk_widget().grid(row=5, column=0, columnspan=3, sticky='nsew')
