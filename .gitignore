@@ -15,6 +15,7 @@ benchmarks/*.png
 benchmarks/*.txt
 testingscripts/derivatives/*.png
 testingscripts/derivativest2/*.png
+testingscripts/pkls/*.pkl
 
 # Ignore VS Code workspace settings
 .vscode/
