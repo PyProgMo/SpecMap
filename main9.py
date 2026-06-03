@@ -706,6 +706,9 @@ class FileProcessorApp:
 
             # self.Cube2Imager: update 
             if hasattr(self, 'Cube2Imager'):
+                # update CubeImager's reference to the new Nanomap instance
+                if hasattr(self.Cube2Imager, 'gui') and self.Cube2Imager.gui is not None:
+                    self.Cube2Imager.gui.Nanomap = self.Nanomap
                 self.Cube2Imager.update_bounds()
 
         else:
@@ -866,6 +869,9 @@ class FileProcessorApp:
         
             # self.Cube2Imager: updte 
             if hasattr(self, 'Cube2Imager'):
+                # update CubeImager's reference to the new Nanomap instance
+                if hasattr(self.Cube2Imager, 'gui') and self.Cube2Imager.gui is not None:
+                    self.Cube2Imager.gui.Nanomap = self.Nanomap
                 self.Cube2Imager.update_bounds()
 
         # Load the state
@@ -889,6 +895,9 @@ class FileProcessorApp:
             
             # self.Cube2Imager: updte 
             if hasattr(self, 'Cube2Imager'):
+                # update CubeImager's reference to the new Nanomap instance
+                if hasattr(self.Cube2Imager, 'gui') and self.Cube2Imager.gui is not None:
+                    self.Cube2Imager.gui.Nanomap = self.Nanomap
                 self.Cube2Imager.update_bounds()      
 
         else:
