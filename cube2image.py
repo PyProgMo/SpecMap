@@ -8,6 +8,12 @@ from matplotlib.figure import Figure
 
 class Cube2ImageGUI:
     def __init__(self, root, Nanomap=None, wlstart=0.0, wlend=1000.0, zoomlen=700.0):
+        self.update_line_profiles = True
+        self.hl = [0, 0, 0]
+        self.vl = [0, 0, 0]
+        self.hlinepos = 0
+        self.vlinepos = 0
+
         try: 
             self.wlstart = float(wlstart)
         except:
@@ -78,12 +84,24 @@ class Cube2ImageGUI:
         button_frame.grid(row=4, column=0, columnspan=3, pady=10)
         ttk.Button(button_frame, text='Plot', command=self.update_plot).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text='Create HSI', command=self.createHSI).pack(side=tk.LEFT, padx=5)
+        # add troggle button for line profiles
+        ttk.Button(button_frame, text='Toggle Line Profiles', command=self.toggle_line_profiles).pack(side=tk.LEFT, padx=5)
+        # add button: export horizontal line profile
+        ttk.Button(button_frame, text='Export Line Profile', command=self.export_hl_profile).pack(side=tk.LEFT, padx=5)
+        # add button: export vertical line profile
+        ttk.Button(button_frame, text='Export Vertical Profile', command=self.export_vl_profile).pack(side=tk.LEFT, padx=5)
         
         # Matplotlib canvas
         self.fig = Figure(figsize=(5, 5))
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.fig, master=main_frame)
         self.canvas.get_tk_widget().grid(row=5, column=0, columnspan=3, sticky='nsew')
+
+        # figure for the line profiles
+        self.hl_profile_fig = Figure(figsize=(5, 2))
+        self.vl_profile_fig = Figure(figsize=(2, 5))
+        self.hl_profile_ax = self.hl_profile_fig.add_subplot(111)
+        self.vl_profile_ax = self.vl_profile_fig.add_subplot(111)
         
         self.datatype_map = {
             'Wavelength axis': 'WL', 'Background (BG)': 'BG', 'Counts (PL)': 'PL', 'Spectrum (PL-BG)': 'PLB', 
@@ -101,6 +119,46 @@ class Cube2ImageGUI:
 
         self.image_artist = None
         self.colorbar = None
+
+        # setup: add red line to display horizontal and vertical line profiles
+        self.hl_line = None
+        self.vl_line = None
+
+        self.update_plot()  # Initial plot
+    
+    def _draw_line_profiles(self, hline, vline):
+        if self.hl_line is not None:
+            try:
+                self.hl_line.remove()
+            except Exception:
+                pass
+            self.hl_line = None
+        if self.vl_line is not None:
+            try:
+                self.vl_line.remove()
+            except Exception:
+                pass
+            self.vl_line = None
+
+        if hline is not None and vline is not None:
+            # Draw horizontal line profile
+            self.hl_line = self.ax.axhline(y=hline, color='red', linestyle='--', label='Horizontal Line Profile')
+            # Draw vertical line profile
+            self.vl_line = self.ax.axvline(x=vline, color='blue', linestyle='--', label='Vertical Line Profile')
+            self.canvas.draw_idle()
+    
+    def export_hl_profile(self):
+        pass
+
+    def export_vl_profile(self):
+        pass
+
+    def toggle_line_profiles(self):
+        self.update_line_profiles = not self.update_line_profiles
+        if self.update_line_profiles:
+            self._draw_line_profiles(self.hlinepos, self.vlinepos)
+        else:
+            self._draw_line_profiles(None, None)
     
     def change_colormap(self):
         selected_cmap = self.colormap_var.get()
@@ -162,6 +220,8 @@ class Cube2ImageGUI:
                         img[i, j] = np.sum(data[idx])
                 
                 self._draw_image(img, title=f'{dt_label}: {start:.1f} - {start + width:.1f} nm')
+                if self.update_line_profiles:
+                    self._draw_line_profiles(self.hlinepos, self.hlinepos)
                 return
         except Exception as e:
             self._clear_plot()
@@ -172,6 +232,7 @@ class Cube2ImageGUI:
         self._clear_plot()
         self.ax.text(0.5, 0.5, 'No wavelength data available', ha='center', va='center')
         self.canvas.draw_idle()
+
 
     def set_manual_wavelengths(self):
         try:
@@ -262,10 +323,50 @@ class Cube2ImageGUI:
         self.Nanomap = None
         self.root = None
 
+class lineprofiles:
+    def __init__(self, xdata, ydata, label=None, mplwidget=None):
+        self.xdata = xdata
+        self.ydata = ydata
+        self.label = label
+        self.mplwidget = mplwidget
+
 class Cube2Image:
     def __init__(self, Nanomap=None, guiroot=None):
-        self.gui = Cube2ImageGUI(guiroot, Nanomap)
+        # befor passing guiroot: add scrollbar to guiroot if it doesn't have one
+        frame = self.add_scrollbar(guiroot)
+        self.gui = Cube2ImageGUI(frame, Nanomap)
     
+    def add_scrollbar(self, root):
+        # Check if the root already has a scrollbar
+        if isinstance(root, tk.Tk) or isinstance(root, tk.Toplevel):
+            # Create a canvas and a vertical scrollbar for scrolling
+            canvas = tk.Canvas(root)
+            scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
+            scrollable_frame = ttk.Frame(canvas)
+
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(
+                    scrollregion=canvas.bbox("all")
+                )
+            )
+
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+            # add a horizontal scrollbar
+            h_scrollbar = ttk.Scrollbar(root, orient="horizontal", command=canvas.xview)
+            canvas.configure(xscrollcommand=h_scrollbar.set)
+            h_scrollbar.pack(side="bottom", fill="x")
+
+            # Pack the canvas and scrollbar
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            h_scrollbar.pack(side="bottom", fill="x")
+
+            return scrollable_frame
+        else:
+            return root  # If it's not a Tk or Toplevel, just return it as is
+
     def destroy(self):
         if hasattr(self, 'gui') and self.gui is not None:
             self.gui.destroy()
