@@ -8,12 +8,6 @@ from matplotlib.figure import Figure
 
 class Cube2ImageGUI:
     def __init__(self, root, Nanomap=None, wlstart=0.0, wlend=1000.0, zoomlen=700.0):
-        self.update_line_profiles = True
-        self.hl = [0, 0, 0]
-        self.vl = [0, 0, 0]
-        self.hlinepos = 0
-        self.vlinepos = 0
-
         try: 
             self.wlstart = float(wlstart)
         except:
@@ -44,7 +38,7 @@ class Cube2ImageGUI:
         self.datatype_cb.grid(row=0, column=1, sticky='we')
         
         # Start and Width sliders
-        ttk.Label(main_frame, text='Integration Start (nm):').grid(row=1, column=0, sticky=tk.W)
+        ttk.Label(main_frame, text='Integration Central WL (nm):').grid(row=1, column=0, sticky=tk.W)
         self.start_slider = ttk.Scale(main_frame, from_=self.wlstart, to=self.wlend, value=(self.wlend-self.wlstart)/2, command=self.update_plot, length=self.zoomlen)
         self.start_slider.grid(row=1, column=1, sticky='we')
         self.start_val_label = ttk.Label(main_frame, text='500.0', width=8)
@@ -84,12 +78,6 @@ class Cube2ImageGUI:
         button_frame.grid(row=4, column=0, columnspan=3, pady=10)
         ttk.Button(button_frame, text='Plot', command=self.update_plot).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text='Create HSI', command=self.createHSI).pack(side=tk.LEFT, padx=5)
-        # add troggle button for line profiles
-        ttk.Button(button_frame, text='Toggle Line Profiles', command=self.toggle_line_profiles).pack(side=tk.LEFT, padx=5)
-        # add button: export horizontal line profile
-        ttk.Button(button_frame, text='Export Line Profile', command=self.export_hl_profile).pack(side=tk.LEFT, padx=5)
-        # add button: export vertical line profile
-        ttk.Button(button_frame, text='Export Vertical Profile', command=self.export_vl_profile).pack(side=tk.LEFT, padx=5)
         
         # Matplotlib canvas
         self.fig = Figure(figsize=(5, 5))
@@ -120,45 +108,7 @@ class Cube2ImageGUI:
         self.image_artist = None
         self.colorbar = None
 
-        # setup: add red line to display horizontal and vertical line profiles
-        self.hl_line = None
-        self.vl_line = None
-
         self.update_plot()  # Initial plot
-    
-    def _draw_line_profiles(self, hline, vline):
-        if self.hl_line is not None:
-            try:
-                self.hl_line.remove()
-            except Exception:
-                pass
-            self.hl_line = None
-        if self.vl_line is not None:
-            try:
-                self.vl_line.remove()
-            except Exception:
-                pass
-            self.vl_line = None
-
-        if hline is not None and vline is not None:
-            # Draw horizontal line profile
-            self.hl_line = self.ax.axhline(y=hline, color='red', linestyle='--', label='Horizontal Line Profile')
-            # Draw vertical line profile
-            self.vl_line = self.ax.axvline(x=vline, color='blue', linestyle='--', label='Vertical Line Profile')
-            self.canvas.draw_idle()
-    
-    def export_hl_profile(self):
-        pass
-
-    def export_vl_profile(self):
-        pass
-
-    def toggle_line_profiles(self):
-        self.update_line_profiles = not self.update_line_profiles
-        if self.update_line_profiles:
-            self._draw_line_profiles(self.hlinepos, self.vlinepos)
-        else:
-            self._draw_line_profiles(None, None)
     
     def change_colormap(self):
         selected_cmap = self.colormap_var.get()
@@ -192,7 +142,8 @@ class Cube2ImageGUI:
         self.canvas.draw_idle()
     
     def update_plot(self, *args):
-        start = float(self.start_slider.get())
+        centerwl = float(self.start_slider.get())
+        start = centerwl - float(self.width_slider.get()) / 2
         width = float(self.width_slider.get())
         
         self.start_val_label.config(text=f"{start:.1f}")
@@ -220,8 +171,6 @@ class Cube2ImageGUI:
                         img[i, j] = np.sum(data[idx])
                 
                 self._draw_image(img, title=f'{dt_label}: {start:.1f} - {start + width:.1f} nm')
-                if self.update_line_profiles:
-                    self._draw_line_profiles(self.hlinepos, self.hlinepos)
                 return
         except Exception as e:
             self._clear_plot()

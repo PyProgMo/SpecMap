@@ -145,7 +145,8 @@ class SpectrumData:
                 elif startreaddata == True:
                     try:
                         if self.loadeachbg == True:
-                            self.BG.append(int(parts[1]))
+                            #self.BG.append(int(parts[1]))
+                            print("Warning: loadeachbg is True, but BG data is not being loaded. Check implementation.")
                         #self.WL.append(float(parts[0]))  WL is only read once by XYMap since each SpectrumData has the same WL-axis
                         self.PL.append(int(parts[2]))
                     except Exception as e:
