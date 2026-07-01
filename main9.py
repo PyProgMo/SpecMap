@@ -20,6 +20,13 @@ import error_handler  # Centralized error handling and logging
 import datetime as datet
 import plotspecs
 import cube2image
+try:
+    import marwin_specplot.marwin_specplot1 as marwin_specplotlib
+    importmarwin = True
+    print("Marwins specplotter imported successfully.")
+except:
+    importmarwin = False
+    print("Marwins specplotter not imported, check if marwin_specplot.py is in the same directory as main.py")
 
 class FileProcessorApp:
     def __init__(self, root, defaults):
@@ -119,6 +126,12 @@ class FileProcessorApp:
             frame = ttk.Frame(self.notebook)
             self.notebook.add(frame, text=notebookentries[i])
             self.nodeframes[notebookentries[i]] = frame
+        
+        if 'Marwins Spekplotter' in notebookentries and importmarwin:
+            # check if self.marwinspecplot is already created, if not create it
+            if hasattr(self, 'marwin_specplot'):
+                self.marwin_specplot.clear()
+            self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])
 
     def createbuttons(self, Notebook):
         # Create a canvas with scrollbars for the Load Data tab
@@ -303,6 +316,27 @@ class FileProcessorApp:
         self.calc_norm_on_intensity_check = tk.Checkbutton(self.cosmicframe, text="norm on I, then derive", variable=self.calc_norm_on_intensityBool)
         self.calc_norm_on_intensity_check.grid(row=4, column=3)
 
+        # if Marwins specplotter importet
+        if importmarwin:
+            self.marvs = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])
+            # buld frame to select dir and open Marwins specplotter
+            self.mwframe = tk.Frame(self.load_content_frame, width=60, height=100, borderwidth=5, relief="ridge")
+            self.mwframe.grid(row=1, column=1, padx=5, pady=5)
+
+            # Folder selection
+            self.marwin_label = tk.Label(self.mwframe, text="Select folder with spectra for Marwins Specplotter", width=100)
+            self.marwin_label.pack()
+            self.marwin_label_folder_label = tk.Label(self.mwframe, text="Select Folder")
+            self.marwin_label_folder_label.pack()
+            self.marwin_folder_entry = tk.Entry(self.mwframe)
+            self.marwin_folder_entry.pack(fill=tk.X)
+
+            # add Browse and load buttons
+            self.marwin_folder_button = tk.Button(self.mwframe, text="Browse", command=lambda: deflib.browse_folder(self.marwin_folder_entry))
+            self.marwin_folder_button.pack(side=tk.LEFT, padx=5)
+            self.marwin_load_button = tk.Button(self.mwframe, text="Load Marwins Plotter", command=lambda: self.marvs.load_dataset(self.marwin_folder_entry.get()))
+            self.marwin_load_button.pack(side=tk.LEFT, padx=5)
+
         # Clara load frame (now inside load_content_frame)
         self.claraloadframe = tk.Frame(self.load_content_frame, width=60, height=100, borderwidth=5, relief="ridge")
         self.claraloadframe.grid(row=1, column=0, padx=5, pady=5)
@@ -428,7 +462,7 @@ class FileProcessorApp:
             defaults['hsifilesorter_savedir'], 
             defaults['hsifilesorter_processdir']
             )
-    
+        
     def _on_canvas_configure(self, event):
         """Update canvas window width when canvas is resized"""
         # Ensure minimum width of 500 pixels for proper horizontal scrolling
