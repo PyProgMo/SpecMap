@@ -12,6 +12,30 @@ from scipy.signal import hilbert
 
 
 # window functions
+def voigt_pseudo(x, cen, fwhm, eta):
+    sigma = fwhm / 2.354820045
+    gamma = fwhm / 2.0
+    G = np.exp(-0.5 * ((x - cen) / sigma)**2)
+    L = gamma**2 / ((x - cen)**2 + gamma**2)
+    return eta * L + (1 - eta) * G
+
+def doublevoigt5param(x, A, EX, fwhm, r, B, delta=30.0, eta=0.5):
+    """
+    A     : overall amplitude
+    EX    : exciton (center of main peak)
+    fwhm  : shared width
+    r     : relative amplitude (trion/exciton)
+    B     : background
+    delta : fixed splitting (meV), default ~30 meV for MoSe2
+    eta   : mixing parameter (0=Gaussian, 1=Lorentzian)
+    """
+    peak1 = voigt_pseudo(x, EX, fwhm, eta)
+    peak2 = voigt_pseudo(x, EX - delta, fwhm, eta)
+    
+    return A * (peak1 + r * peak2) + B
+
+def doublevoigt5paramwind(x, A, EX, fwhm, r, B):
+    return doublevoigt5param(x, A, EX, fwhm, r, B)
 
 def double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2):
     return voigtwind(x, amp1, cen1, wid1, gamma1) + voigtwind(x, amp2, cen2, wid2, gamma2)
@@ -52,6 +76,52 @@ def linearwind(x, a, b):
     return np.multiply(a, x) + b
 
 # estimate initial parameters for fitting functions
+
+def doublevoigt_5param_approx(x, y, delta=30.0):
+    """
+    Estimate starting parameters for:
+    I(E) = A * [V(EX) + r * V(EX - delta)] + B
+
+    Returns:
+    A, EX, fwhm, r, B
+    """
+
+    # --- 1. Background (robust) ---
+    B = np.percentile(y, 5)  # lower baseline estimate
+    y_corr = y - B
+
+    # --- 2. Exciton peak (dominant) ---
+    idx_max = np.argmax(y_corr)
+    EX = x[idx_max]
+    A = y_corr[idx_max]
+
+    # --- 3. FWHM (merged peak) ---
+    half_max = A / 2
+    above = np.where(y_corr > half_max)[0]
+
+    if len(above) > 2:
+        fwhm = x[above[-1]] - x[above[0]]
+    else:
+        fwhm = (x[-1] - x[0]) / 10  # fallback
+
+    # --- 4. Estimate trion contribution r ---
+    # look at intensity at EX - delta
+    target_E = EX - delta
+    idx_trion = np.argmin(np.abs(x - target_E))
+
+    I_trion = y_corr[idx_trion]
+
+    # crude ratio estimate
+    r = I_trion / A
+
+    # constrain to physical range
+    r = np.clip(r, 0.05, 1.0)
+
+    # --- 5. Final amplitude scaling ---
+    # A should represent total prefactor
+    # since model is A*(1 + r*...), reduce slightly
+    A = A / (1 + r)
+    return A, EX, fwhm, r, B
 
 def estimate_voigt_params(x, y):
     """
@@ -332,6 +402,17 @@ def fitlinetospec(start, end, WL, PLB, maxfev=10000, guess=None):
     a, b = fitdata
     return a, b, pconf
 
+def fitdoublevoigt5paramtospec(start, end, WL, PLB, maxfev=10000, guess=None):
+    x = WL[start: end]
+    y = PLB[start: end]
+    if guess is None:
+        initialguess = doublevoigt_5param_approx(x, y)
+    else:
+        initialguess = guess[0:5]
+    fitdata, pcov = curve_fit(doublevoigt5param, x, y, p0=initialguess, maxfev=maxfev)
+    A_fit, EX_fit, fwhm_fit, r_fit, B_fit = fitdata
+    return A_fit, EX_fit, fwhm_fit, r_fit, B_fit, pcov
+
 # get maxima of fitted functions
 def getmaxdoublegaussian(xmin, xmax, amp1, cen1, wid1, amp2, cen2, wid2):
     # use newton method to find max
@@ -367,6 +448,13 @@ def getmaxvoigt(xmin, xmax, amp, cen, wid, gamma):
 
 def getmaxlinear(xmin, xmax, a, b):
     pass
+
+def getmaxdoublevoigt5param(xmin, xmax, A, EX, fwhm, r, B):
+    #x = Newtonmax(lambda x: -doublevoigt_5param(x, A, EX, fwhm, r, B), EX, tol=1e-6, maxiter=10000, xmin=xmin, xmax=xmax)
+    #y = doublevoigt_5param(x, A, EX, fwhm, r, B)
+    x, y = Maxbyinsert(lambda x: -doublevoigt5param(x, A, EX, fwhm, r, B), [xmin, xmax], 10000)
+    #success, x, fun = find_max_of_fit(lambda x: -doublevoigt_5param(x, A, EX, fwhm, r, B), xmin=xmin, xmax=xmax)
+    return x, y #-fun
 
 # 2D Pixmatrix Fit functions
 # 2d gaussian function
@@ -539,14 +627,52 @@ def getdoublelorentzfwhm(fitparams):
     fwhm2 = 2 * wid2
     return fwhm1 + fwhm2
 
-def getdoublevoigtfwhm(fitparams):
-    # returns the FWHM of a double voigt fit
-    # fitparams: amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2
-    amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2 = fitparams[0:8]
-    # FWHM of a Voigt profile is not straightforward, so it is calculated on a grid using the fwhmbygrid function
-    fwhm1 = fwhmbygrid(lambda x: voigtwind(x, amp1, cen1, wid1, gamma1), cen1 - 5 * wid1, cen1 + 5 * wid1)
-    fwhm2 = fwhmbygrid(lambda x: voigtwind(x, amp2, cen2, wid2, gamma2), cen2 - 5 * wid2, cen2 + 5 * wid2)
-    return fwhm1 + fwhm2
+def getdoublevoigtfwhm(xgrid, fitparams):
+    amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2 = fitparams
+
+    y = (
+        voigtwind(xgrid, amp1, cen1, wid1, gamma1) +
+        voigtwind(xgrid, amp2, cen2, wid2, gamma2)
+    )
+
+    ymax = np.max(y)
+    half = ymax / 2
+
+    idx = np.where(y >= half)[0]
+    if len(idx) < 2:
+        return np.nan
+
+    i1, i2 = idx[0], idx[-1]
+
+    # linear interpolation (left crossing)
+    x1 = np.interp(half, [y[i1-1], y[i1]], [xgrid[i1-1], xgrid[i1]])
+
+    # right crossing
+    x2 = np.interp(half, [y[i2], y[i2+1]], [xgrid[i2], xgrid[i2+1]])
+
+    return x2 - x1
+
+def getdoublevoigt5paramfwhm(x, A, EX, fwhm, r, B, delta=30, eta=0.5):
+    xinterpolated = np.linspace(EX - delta-3*fwhm, EX + delta+3*fwhm, 10000)  # Create a fine grid around the expected peak
+    y = doublevoigt5param(xinterpolated, A, EX, fwhm, r, B, delta, eta)
+
+    ymax = np.max(y)
+    half = ymax / 2
+
+    # find crossings
+    indices = np.where(y >= half)[0]
+    if len(indices) < 2:
+        return np.nan
+
+    i1, i2 = indices[0], indices[-1]
+
+    # linear interpolation left
+    x1 = x[i1-1] + (half - y[i1-1]) * (x[i1] - x[i1-1]) / (y[i1] - y[i1-1])
+
+    # linear interpolation right
+    x2 = x[i2] + (half - y[i2]) * (x[i2+1] - x[i2]) / (y[i2+1] - y[i2])
+
+    return x2 - x1
 
 def fwhmbygrid(f, wlstart, wlend, npoints=100000):
     # Generate x values
@@ -2405,6 +2531,19 @@ def getderivativepointsfwhm(params):
 # todo: add derivative points methods to fitkeys that use the calculated derivative if it has been calculated. 
 # if not not calculated, init with zeros.
 
+# explained fitkeys structure:
+#            'name':[
+#               window_function, 
+#               fit_function, 
+#               get_max_function, 
+#               'Label for GUI', 
+#               number_of_output_parameters, 
+#               ['list of parameter names'], 
+#               ['list of parameter units'], 
+#               fwhm_function, 
+#               fit_state
+#               ]     
+
 fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit', 3, ['Lorentzian amplitude', 'Lorentzian center', 'Lorentzian width'], ['Counts', 'nm', 'nm'], getlorentzfwhm, 0],
            'gaussian':[gaussianwind, fitgaussiantospec, getmaxgaussian, 'Gaussian fit', 3, ['Gaussian amplitude', 'Gaussian center', 'Gaussian width'], ['Counts', 'nm', 'nm'], getgaussianfwhm, 0],
            'voigt':[voigtwind, fitvoigttospec, getmaxvoigt, 'Voigt fit', 4, ['Voigt amplitude', 'Voigt center', 'Voigt width', 'Voigt gamma'], ['Counts', 'nm', 'nm', 'nm'], getvoigtfwhm, 0], 
@@ -2530,6 +2669,29 @@ fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit
                ['nm', 'Counts'] * 15,
                getderivativepointsfwhm,
                0
+           ], 
+# explained fitkeys structure:
+#            'name':[
+#               window_function, 
+#               fit_function, 
+#               get_max_function, 
+#               'Label for GUI', 
+#               number_of_output_parameters, 
+#               ['list of parameter names'], 
+#               ['list of parameter units'], 
+#               fwhm_function, 
+#               fit_state
+#               ]            
+           'doublevoigt5params': [
+               doublevoigt5paramwind, 
+               fitdoublevoigt5paramtospec, 
+               getmaxdoublevoigt5param, 
+                'Double Voigt 5-Parameter Fit', 
+                5, 
+                ['Amplitude 1', 'Center 1', 'Width 1', 'Amplitude 2', 'Center 2'], 
+                ['Counts', 'nm', 'nm', 'Counts', 'nm'], 
+                getdoublevoigt5paramfwhm,
+                0
            ]
            }
 
@@ -2550,7 +2712,8 @@ fitunits = {'lorentz': fitkeys['lorentz'][6][:]+ unitstoaddfit,
             'binning': fitkeys['binning'][6][:] + unitstoaddfit,
             'derivative1': fitkeys['derivative1'][6][:] + unitstoaddfit,
             'derivative2': fitkeys['derivative2'][6][:] + unitstoaddfit,
-            'derivative_points': fitkeys['derivative_points'][6][:] + unitstoaddfit
+            'derivative_points': fitkeys['derivative_points'][6][:] + unitstoaddfit,
+            'doublevoigt5params': fitkeys['doublevoigt5params'][6][:] + unitstoaddfit
             }
 
 # fitparametersparis: dict of the fit parameters and their units. Key of getlistofallFitparameters() is the key of the fitkeys dictionary
