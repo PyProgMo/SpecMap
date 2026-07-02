@@ -652,9 +652,12 @@ def getdoublevoigtfwhm(xgrid, fitparams):
 
     return x2 - x1
 
-def getdoublevoigt5paramfwhm(x, A, EX, fwhm, r, B, delta=30, eta=0.5):
-    xinterpolated = np.linspace(EX - delta-3*fwhm, EX + delta+3*fwhm, 10000)  # Create a fine grid around the expected peak
-    y = doublevoigt5param(xinterpolated, A, EX, fwhm, r, B, delta, eta)
+def getdoublevoigt5paramfwhm(fitparam): #x, A, EX, fwhm, r, B, delta=30, eta=0.5) # let do this without xgrid as parameter, we can use the fitparam to generate the xgrid
+    A, EX, fwhm, r, B = fitparam # older versions also had delta and eta here, but we will ignore them for now
+    # delta and eta 
+    x = np.linspace(EX - 5 * fwhm, EX + 5 * fwhm, 10000)
+
+    y = doublevoigt5param(x, A, EX, fwhm, r, B)#, delta, eta) 
 
     ymax = np.max(y)
     half = ymax / 2
@@ -666,11 +669,9 @@ def getdoublevoigt5paramfwhm(x, A, EX, fwhm, r, B, delta=30, eta=0.5):
 
     i1, i2 = indices[0], indices[-1]
 
-    # linear interpolation left
-    x1 = x[i1-1] + (half - y[i1-1]) * (x[i1] - x[i1-1]) / (y[i1] - y[i1-1])
-
-    # linear interpolation right
-    x2 = x[i2] + (half - y[i2]) * (x[i2+1] - x[i2]) / (y[i2+1] - y[i2])
+    # use x to find the corresponding x values for the half maximum
+    x1 = np.interp(half, [y[i1-1], y[i1]], [x[i1-1], x[i1]])
+    x2 = np.interp(half, [y[i2], y[i2+1]], [x[i2], x[i2+1]])
 
     return x2 - x1
 
@@ -2681,7 +2682,19 @@ fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit
 #               ['list of parameter units'], 
 #               fwhm_function, 
 #               fit_state
-#               ]            
+#               ]  
+# example:'double voigt':[
+#               double_voigtwind, 
+#               fitdoublevoigttospec, 
+#               getmaxdoublevoigt, 
+#               'Double Voigt fit', 
+#               8, 
+#               ['Double Voigt amplitude 1', 'Double Voigt center 1', 'Double Voigt width 1', 'Double Voigt gamma 1', 'Double Voigt amplitude 2', 'Double Voigt center 2', 'Double Voigt width 2', 'Double Voigt gamma 2'], 
+#               ['Counts', 'nm', 'nm', 'nm', 'Counts', 'nm', 'nm', 'nm'], 
+#               getdoublevoigtfwhm, 
+#               0
+#               ] 
+
            'doublevoigt5params': [
                doublevoigt5paramwind, 
                fitdoublevoigt5paramtospec, 
