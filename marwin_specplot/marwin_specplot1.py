@@ -28,9 +28,7 @@ from scipy.signal import savgol_filter
 # ==========================================================
 # SETTINGS
 # ==========================================================
-#'F:\Promotion\2026_MoSe2_BNNTs\MoSe2\HSI20260603_HSI_MoSe2_BNNT6T_M3_500nm'
-DEFAULT_FOLDER = 'F:\\Promotion\\2026_MoSe2_BNNTs\\MoSe2\\HSI20260603_HSI_MoSe2_BNNT6T_M3_500nm'
-#r"C:\Users\s416107\Desktop\Daten HSI\HSI20260603_HSI_MoSe2_BNNT6T_M3_500nm"
+DEFAULT_FOLDER = r"C:\Users\s416107\Desktop\Daten HSI\HSI20260603_HSI_MoSe2_BNNT6T_M3_500nm"
 PEAK_MIN = 760
 PEAK_MAX = 810
 MAP_INTEGRATION_MIN = 760
