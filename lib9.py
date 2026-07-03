@@ -356,7 +356,7 @@ class XYMap:
         
         # Set metadata if we have data
         if len(self.PMdict) > 0:
-            self.PMmetadata['HSI0'] = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend}
+            self.PMmetadata['HSI0'] = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend, 'unit': '', 'quantatity': '', 'fitmodel':'', 'fitparameter': ''}
     
     def build_gui(self):
         """Build the GUI elements - separated from data loading"""
@@ -504,7 +504,7 @@ class XYMap:
 
         # Button to create colormap
         tk.Label(frame, text="Press button below \nto update data matrix").grid(row=2, column=1)
-        b1 = tk.Button(frame, text="Create intensity colormap", command= lambda: self.buildandPlotIntCmap())
+        b1 = tk.Button(frame, text="Create intensity colormap", command= lambda: self.buildandPlotIntCmap(datatype=self.selectspecbox.get()))
         b1.grid(row=3, column=1)
         b2 = tk.Button(frame, text="Create spectral maximum colormap", command= lambda: self.buildandPlotSpecCmap())
         b2.grid(row=4, column=1)
@@ -584,8 +584,12 @@ class XYMap:
             self.roisel.get(), 
             vis_type=roivistypeselect.get(), 
             color=roicolor.get(),
-            title=self._get_hsi_title(self.hsiselect.get()))
+            title=self._get_hsi_title(self.hsiselect.get()), 
+            unit=self.PMdict[self.hsiselect.get()].metadata['unit'] 
+                if hasattr(self.PMdict[self.hsiselect.get()].metadata, 'unit')
+                else ''
             )
+        )
         b_roi_hsi.grid(row=6, column=0)
         # select roi plot type
         tk.Label(frame, text="ROI Plot Type").grid(row=7, column=0)
@@ -785,7 +789,7 @@ class XYMap:
                 roibynames = roihandler.roiindicees2roinames(self.roihandler, roi_indices)
             
             # Get selected color for each ROI (cycle through colors if more ROIs than colors)
-            color_options = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'cyan', 'magenta']
+            color_options = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'cyan', 'magenta', 'yellow', 'teal', 'navy', 'maroon', 'olive', 'lime', 'coral', 'indigo', 'gold', 'silver']
             
             #for i, roi_idx in enumerate(roibynames):
             #    color = color_options[i % len(color_options)]
@@ -794,6 +798,9 @@ class XYMap:
 
             plotmodes = [self.defentries.get('roi_vis_type', 'cornerlines')] * len(roibynames)
             colors = [color_options[i % len(color_options)] for i in range(len(roibynames))]
+            unit = 'Intensity'
+            if hasattr(self.PMdict[hsi_name].metadata, 'unit'):
+                unit = self.PMdict[hsi_name].metadata['unit']
 
             self.roihandler.plot_multiple_rois_on_pixmatrix(
                 self.roihandler,
@@ -802,7 +809,8 @@ class XYMap:
                 plotmodes,
                 colors,
                 fontsize=self.defentries.get('roi_plot_fontsize', 14),
-                title=self._get_hsi_title(hsi_name)
+                title=self._get_hsi_title(hsi_name), 
+                unit = unit
             )
         
         except Exception as e:
@@ -1797,7 +1805,7 @@ class XYMap:
         self.selectPixY.insert(0, str(self.newsely))
 
     # Max Counts Colormap
-    def buildandPlotIntCmap(self, savetoimage='False', plot=True):
+    def buildandPlotIntCmap(self, savetoimage='False', plot=True, datatype='Spectrum (PL-BG)'):
         hsi_name = self.hsiselect.get()
         if not hsi_name or hsi_name not in self.PMdict:
             print("No valid HSI selected to plot.")
@@ -1809,7 +1817,19 @@ class XYMap:
         self.updatewl()
         # create a new colormap by using the selected HSI
         lastpm = copy.deepcopy(self.PMdict[hsi_name].PixMatrix)
-        newpm = self.writetopixmatrix(lastpm, None)
+        metadata = {}
+        # set metadata for the new colormap
+        if datatype in deflib.datatype2unit:
+            metadata['unit'] = deflib.datatype2unit[datatype]
+            metadata['quantity'] = 'signal'
+            metadata['fitmodel'] = None
+            metadata['fitparams'] = None
+        else: 
+            metadata['unit'] = 'A. U.'
+            metadata['quantity'] = 'signal'
+            metadata['fitmodel'] = None
+            metadata['fitparams'] = None
+        newpm = self.writetopixmatrix(lastpm, None, metadata=metadata)
         self.getPLpixelIntervalMaxIndex(self.PMdict[newpm].PixMatrix, False)
         
         # Apply normalization if enabled
@@ -1850,6 +1870,15 @@ class XYMap:
             # use the ROI mask to fit the pixel matrix
             self.fittoMatrixfitparams(self.PMdict[newpm].PixMatrix, 'fitmaxX', mode='roi', roi=roi)
         self.getPLpixelSpecMax(self.PMdict[newpm].PixMatrix)
+        # update matadata of newpm: 'unit', 'quantity', 'fitmodel', 'fitparams'
+        # 1. set unit according to selected fit function mathlib.fitkeys[self.selectwindowbox.get()][6][0]
+        if self.selectwindowbox.get() in matl.fitkeys:
+            newpm.metadata['unit'] = 'nm'
+            newpm.metadata['quantity'] = 'maximum wavelength of fit function'
+            newpm.metadata['fitmodel'] = self.selectwindowbox.get()
+            newpm.metadata['fitparameter'] = None
+        else:
+            newpm.metadata['unit'] = 'A. U.'
         
         # Apply normalization if enabled
         norm_matrix = self.get_normalization_matrix()
@@ -2443,6 +2472,8 @@ class XYMap:
         # Add a colorbar to the image
         cbar = fig.colorbar(cax, ax=ax)
         # Set the colorbar label
+        if 'unit' in self.PMdict[HSIname].metadata:
+            leglabel = self.PMdict[HSIname].metadata['unit']
         cbar.set_label(leglabel, fontsize=self.fontsize)
         # Set the font size of the colorbar ticks
         cbar.ax.tick_params(labelsize=self.fontsize)
@@ -3186,7 +3217,7 @@ class XYMap:
         )
         return(PixelMatrix, SpectralMatrix, matpixax, matpiyax)
     
-    def writetopixmatrix(self, matrix, name=None):
+    def writetopixmatrix(self, matrix, name=None, metadata=None):
         # selected dataset = self.PMdict[self.hsiselect.get()]
 
         if name == None or name not in self.PMdict.keys():
@@ -3206,7 +3237,11 @@ class XYMap:
         # add new PixMatrix to the dictionary with its metadata
         self.PMdict[newpmname] = PMlib.PMclass(np.asarray(matrix), self.PixAxX, self.PixAxY, self.PMmetadata)
         self.PMdict[newpmname].name = newpmname
-        self.PMdict[newpmname].metadata = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend}
+        self.PMdict[newpmname].metadata = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend, 'unit': '', 'quantatity': '', 'fitmodel':'', 'fitparameter': ''}
+        if metadata is not None:
+            for i in metadata:
+                self.PMdict[newpmname].metadata[i] = metadata[i]
+
         self.PMdict[newpmname].units = {'x': 'um', 'y': 'um', 'wl': 'nm', 'z': ''}
         return newpmname
 

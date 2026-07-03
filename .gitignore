@@ -19,3 +19,6 @@ testingscripts/pkls/*.pkl
 
 # Ignore VS Code workspace settings
 .vscode/
+
+# ignore defaults.txt file
+defaults.txt

@@ -1445,7 +1445,7 @@ defaulttypes = {
     'calc_norm_and_derive': bool,
     'calc_norm_on_intensity': bool, 
     'roi_plot_color': str,
-    'roi_vis_type': 'str',
+    'roi_vis_type': str,
 }
 
 def testdefaults():
@@ -1780,6 +1780,16 @@ def plot_HSI(data, metadata=None, cmap='hot', vmin=None, vmax=None,
 
 ### HSI normalize block: implement normalize HSI on a certain criteria
 
+
+# datatype 2 unit decoding for integration: 
+datatype2unit = {
+    'Wavelength axis': 'nm',
+    'Background (BG)': 'Counts',
+    'Counts (PL)': 'Counts',
+    'Spectrum (PL-BG)': 'Counts',
+    'first_derivative': 'Counts/nm',
+    'second_derivative': 'Counts/nm^2',
+    } # rest: use 'A. U.' for arbitrary units for all other data types
 
 # check definitions 
 if __name__ == '__main__':

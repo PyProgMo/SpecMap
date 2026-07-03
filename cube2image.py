@@ -233,7 +233,7 @@ class Cube2ImageGUI:
 
         if hasattr(self.Nanomap, 'buildandPlotIntCmap'):
             try:
-                self.Nanomap.buildandPlotIntCmap(savetoimage='False', plot=False)
+                self.Nanomap.buildandPlotIntCmap(savetoimage='False', plot=False, datatype=dt, wlstart=wlstart, wlend=wlend)
                 self.update_plot()
             except Exception as e:
                 self._clear_plot()

@@ -175,7 +175,7 @@ class Roihandler():
         Y, X = np.indices(clean_roi.shape)
         ax.contour(X, Y, clean_roi, levels=[0.5], colors=[color], linewidths=3)
 
-    def plot_roi_on_pixmatrix(self, pixmatrix, roiname, vis_type='overlay', color='red', fontsize=12, title=None):
+    def plot_roi_on_pixmatrix(self, pixmatrix, roiname, vis_type='overlay', color='red', fontsize=12, title=None, unit='A. U.'):
         vis_funcs = {
             'overlay': self._draw_overlay,
             'cornerlines': self._draw_cornerlines
@@ -206,7 +206,7 @@ class Roihandler():
         else:
             print(f"ROI '{roiname}' not found.")
     
-    def plot_multiple_rois_on_pixmatrix(self, handler, pixmatrix, roinames, plotmodes, colors, fontsize=14, title=None):
+    def plot_multiple_rois_on_pixmatrix(self, handler, pixmatrix, roinames, plotmodes, colors, fontsize=14, title=None, unit='A. U.'):
         vis_funcs = {
             'overlay': self._draw_overlay,
             'cornerlines': self._draw_cornerlines
@@ -214,7 +214,7 @@ class Roihandler():
         #display pixmatrix as background using standard colormap before plotting any rois, so it doesn't get overwritten by the rois
         fig, ax = plt.subplots()
         img = ax.imshow(pixmatrix, cmap=self.cmap)
-        fig.colorbar(img, ax=ax, label='Intensity')
+        fig.colorbar(img, ax=ax, label=unit)
         for roiname, plotmode, color in zip(roinames, plotmodes, colors):
             if roiname in handler.roilist:
                 roi = handler.roilist[roiname]

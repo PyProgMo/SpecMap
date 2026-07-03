@@ -589,7 +589,7 @@ class FileProcessorApp:
                             gc.collect()
                         self.spec_loadfiles()
                         # create intensity colormap and save spectra
-                        self.Nanomap.buildandPlotIntCmap(savetoimage=imagesavefolder)
+                        self.Nanomap.buildandPlotIntCmap(savetoimage=imagesavefolder, datatype=self.defaults['data_set'])
 
                         # save the HSI object if the checkbox is selected
                         if self.save_multiple_HSIs_bool.get() == True:

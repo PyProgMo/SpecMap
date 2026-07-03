@@ -1,4 +1,5 @@
-data_file = E:/HSI_backup_oct25/data_sorted_unmerged/HSI20240909_I03
+data_file = E:/data/2026/MoSe2/HSI20260603_HSI_MoSe2_BNNT6T_M3_500nm
+#E:/HSI_backup_oct25/data_sorted_unmerged/HSI20240909_I03
 # C:/Users/volib/Desktop/PhD/Homeoffice/251017/PbI_undoped/HSI20251016_HSI_PbI_Sn0_snipped
 # E:\Promotion\SpecMap\SpecMap\testdatasets\HSI20240903_I01
 # C:\Users\volib\Desktop\PhD\Homeoffice\251017\PbI_undoped\HSI20251015_HSI_Refl_PbI_Sn0
