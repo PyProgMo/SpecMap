@@ -208,7 +208,7 @@ class HSIExplorer:
         self.ax_map.set_title("HSI map: click pixels")
         self.ax_map.set_xlabel("Pixel X")
         self.ax_map.set_ylabel("Pixel Y")
-        self.ax_map.invert_yaxis()
+        #self.ax_map.invert_yaxis()
         self.ax_map.set_aspect("equal")
         self.setup_spectrum_axis()
         self.fig.tight_layout()
