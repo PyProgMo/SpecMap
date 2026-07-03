@@ -1873,12 +1873,12 @@ class XYMap:
         # update matadata of newpm: 'unit', 'quantity', 'fitmodel', 'fitparams'
         # 1. set unit according to selected fit function mathlib.fitkeys[self.selectwindowbox.get()][6][0]
         if self.selectwindowbox.get() in matl.fitkeys:
-            newpm.metadata['unit'] = 'nm'
-            newpm.metadata['quantity'] = 'maximum wavelength of fit function'
-            newpm.metadata['fitmodel'] = self.selectwindowbox.get()
-            newpm.metadata['fitparameter'] = None
+            self.PMdict[newpm].metadata['unit'] = 'nm'
+            self.PMdict[newpm].metadata['quantity'] = 'maximum wavelength of fit function'
+            self.PMdict[newpm].metadata['fitmodel'] = self.selectwindowbox.get()
+            self.PMdict[newpm].metadata['fitparameter'] = None
         else:
-            newpm.metadata['unit'] = 'A. U.'
+            self.PMdict[newpm].metadata['unit'] = 'A. U.'
         
         # Apply normalization if enabled
         norm_matrix = self.get_normalization_matrix()
