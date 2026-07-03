@@ -1787,8 +1787,8 @@ datatype2unit = {
     'Background (BG)': 'Counts',
     'Counts (PL)': 'Counts',
     'Spectrum (PL-BG)': 'Counts',
-    'first_derivative': 'Counts/nm',
-    'second_derivative': 'Counts/nm^2',
+    'first_derivative': 'Counts',
+    'second_derivative': 'Counts',
     } # rest: use 'A. U.' for arbitrary units for all other data types
 
 # check definitions 

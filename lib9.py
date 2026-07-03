@@ -1874,7 +1874,7 @@ class XYMap:
         # 1. set unit according to selected fit function mathlib.fitkeys[self.selectwindowbox.get()][6][0]
         if self.selectwindowbox.get() in matl.fitkeys:
             self.PMdict[newpm].metadata['unit'] = 'nm'
-            self.PMdict[newpm].metadata['quantity'] = 'maximum wavelength of fit function'
+            self.PMdict[newpm].metadata['quantity'] = 'wavelength'
             self.PMdict[newpm].metadata['fitmodel'] = self.selectwindowbox.get()
             self.PMdict[newpm].metadata['fitparameter'] = None
         else:
@@ -2472,8 +2472,12 @@ class XYMap:
         # Add a colorbar to the image
         cbar = fig.colorbar(cax, ax=ax)
         # Set the colorbar label
+        leglabel = ''
+        if 'quantity' in self.PMdict[HSIname].metadata:
+            leglabel = self.PMdict[HSIname].metadata['quantity']
         if 'unit' in self.PMdict[HSIname].metadata:
-            leglabel = self.PMdict[HSIname].metadata['unit']
+            #leglabel += self.PMdict[HSIname].metadata['unit']
+            leglabel = f'{leglabel} // {self.PMdict[HSIname].metadata["unit"]}'
         cbar.set_label(leglabel, fontsize=self.fontsize)
         # Set the font size of the colorbar ticks
         cbar.ax.tick_params(labelsize=self.fontsize)
