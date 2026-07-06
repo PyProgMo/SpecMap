@@ -3261,13 +3261,20 @@ class XYMap:
         # prepare metadata: 
         metadata = {
             # get unit from fit fitkeys[selected fitfunction][selected fitparameter]
-            'unit': self.fitkeys[self.selectwindowbox.get()][6][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectwindowbox.get()[6]]) else '',
-            'quantatity': '', 
-            'fitmodel':'', 
-            'fitparameter': ''
+            #'unit': self.fitkeys[self.selectwindowbox.get()][6][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][6]) else 'failed to get unit in plotHSIfromfitparam',
+
+            'unit': self.fitkeys[self.selectwindowbox.get()][6][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectfitparambox.get().split(' ')[-1][:1].isdigit() and self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][6]) else 'failed to get unit in plotHSIfromfitparam',
+
+            # get quantatity from fit fitkeys[selected fitfunction][selected fitparameter]
+            'quantatity': self.fitkeys[self.selectwindowbox.get()][5][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][5]) else 'failed to get quantatity in plotHSIfromfitparam', 
+
+            # get fitmodel from fitkeys[selected fitfunction]
+            'fitmodel': self.selectfitparambox.get().split(' ')[0] if self.selectfitparambox.get()[0] in self.fitkeys else 'failed to get fitmodel in plotHSIfromfitparam',
+            # get fitparameter from selectfitparambox
+            'fitparameter': self.selectfitparambox.get() if self.selectfitparambox.get() != '' else 'failed to get fitparameter in plotHSIfromfitparam'
         }
 
-        newpm = self.writetopixmatrix(lastpm, None)
+        newpm = self.writetopixmatrix(lastpm, metadata=metadata)
         self.getPLpixelIntervalMaxIndex(self.PMdict[newpm].PixMatrix, False)
 
         roi = lastpm[:]
