@@ -3,7 +3,7 @@ import json
 from scipy.signal import savgol_filter
 
 class PMclass(): # PixMatrix class
-    def __init__(self, PixMatrix, xax, yax, metadata, name='', units='', description='', data_type=''):
+    def __init__(self, PixMatrix, xax, yax, metadata, name='dummy1', units='dummy2', description='dummy3', data_type='dummy4'):
         self.PixMatrix = PixMatrix
         self.xax = xax
         self.yax = yax

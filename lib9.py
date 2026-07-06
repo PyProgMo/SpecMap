@@ -2477,7 +2477,7 @@ class XYMap:
             leglabel = self.PMdict[HSIname].metadata['quantity']
         if 'unit' in self.PMdict[HSIname].metadata:
             #leglabel += self.PMdict[HSIname].metadata['unit']
-            leglabel = f'{leglabel} // {self.PMdict[HSIname].metadata["unit"]}'
+            leglabel = f'{leglabel} {self.PMdict[HSIname].metadata["unit"]}'
         cbar.set_label(leglabel, fontsize=self.fontsize)
         # Set the font size of the colorbar ticks
         cbar.ax.tick_params(labelsize=self.fontsize)
