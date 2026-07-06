@@ -3241,7 +3241,12 @@ class XYMap:
         # add new PixMatrix to the dictionary with its metadata
         self.PMdict[newpmname] = PMlib.PMclass(np.asarray(matrix), self.PixAxX, self.PixAxY, self.PMmetadata)
         self.PMdict[newpmname].name = newpmname
-        self.PMdict[newpmname].metadata = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend, 'unit': '', 'quantatity': '', 'fitmodel':'', 'fitparameter': ''}
+        self.PMdict[newpmname].metadata = {'wlstart': self.wlstart, 'wlend': self.wlend, 'countthresh': self.countthreshv, 'aqpixstart': self.aqpixstart, 'aqpixend': self.aqpixend, 
+        'unit': '', 
+        'quantatity': '', 
+        'fitmodel':'', 
+        'fitparameter': ''
+        }
         if metadata is not None:
             for i in metadata:
                 self.PMdict[newpmname].metadata[i] = metadata[i]
@@ -3253,6 +3258,15 @@ class XYMap:
         self.updatewl()
         self.updatecountthresh()
         lastpm = copy.deepcopy(self.PMdict[self.hsiselect.get()].PixMatrix)
+        # prepare metadata: 
+        metadata = {
+            # get unit from fit fitkeys[selected fitfunction][selected fitparameter]
+            'unit': self.fitkeys[self.selectwindowbox.get()][6][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectwindowbox.get()[6]]) else '',
+            'quantatity': '', 
+            'fitmodel':'', 
+            'fitparameter': ''
+        }
+
         newpm = self.writetopixmatrix(lastpm, None)
         self.getPLpixelIntervalMaxIndex(self.PMdict[newpm].PixMatrix, False)
 
