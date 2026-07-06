@@ -2477,7 +2477,9 @@ class XYMap:
             leglabel = self.PMdict[HSIname].metadata['quantity']
         if 'unit' in self.PMdict[HSIname].metadata:
             #leglabel += self.PMdict[HSIname].metadata['unit']
-            leglabel = f'{leglabel} {self.PMdict[HSIname].metadata["unit"]}'
+            leglabel = f'{leglabel} // {self.PMdict[HSIname].metadata["unit"]}'
+        elif 'unit' not in self.PMdict[HSIname].metadata and leglabel == '':
+            leglabel = 'Counts'
         cbar.set_label(leglabel, fontsize=self.fontsize)
         # Set the font size of the colorbar ticks
         cbar.ax.tick_params(labelsize=self.fontsize)
@@ -3266,7 +3268,7 @@ class XYMap:
             'unit': self.fitkeys[self.selectwindowbox.get()][6][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectfitparambox.get().split(' ')[-1][:1].isdigit() and self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][6]) else 'failed to get unit in plotHSIfromfitparam',
 
             # get quantatity from fit fitkeys[selected fitfunction][selected fitparameter]
-            'quantatity': self.fitkeys[self.selectwindowbox.get()][5][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][5]) else 'failed to get quantatity in plotHSIfromfitparam', 
+            'quantity': self.fitkeys[self.selectwindowbox.get()][5][int(self.selectfitparambox.get().split(' ')[-1])] if self.selectfitparambox.get().split(' ')[-1][:1].isdigit() and self.selectwindowbox.get() in self.fitkeys and int(self.selectfitparambox.get().split(' ')[-1]) <= len(self.fitkeys[self.selectfitparambox.get().split(' ')[0]][5]) else 'failed to get quantatity in plotHSIfromfitparam', 
 
             # get fitmodel from fitkeys[selected fitfunction]
             'fitmodel': self.selectfitparambox.get().split(' ')[0] if self.selectfitparambox.get()[0] in self.fitkeys else 'failed to get fitmodel in plotHSIfromfitparam',
