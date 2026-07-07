@@ -318,7 +318,27 @@ class FileProcessorApp:
 
         # if Marwins specplotter importet
         if importmarwin:
-            self.marvs = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])
+            # before parsing self.nodeframes['Marwins Spekplotter'] as root element, add x and y scrollbar
+            frame = self.nodeframes['Marwins Spekplotter']
+            frame.grid_rowconfigure(0, weight=1)
+            frame.grid_columnconfigure(0, weight=1)
+            self.marwin_canvas = tk.Canvas(frame)
+            # add vertical scrollbar
+            self.marwin_vsb = tk.Scrollbar(frame, orient="vertical", command=self.marwin_canvas.yview)
+            self.marwin_vsb.grid(row=0, column=1, sticky='ns')
+            # add horizontal scrollbar
+            self.marwin_hsb = tk.Scrollbar(frame, orient="horizontal", command=self.marwin_canvas.xview)
+            self.marwin_hsb.grid(row=1, column=0, sticky='ew')
+            self.marwin_canvas.configure(yscrollcommand=self.marwin_vsb.set, xscrollcommand=self.marwin_hsb.set)
+            self.marwin_canvas.grid(row=0, column=0, sticky='nsew')
+            # create a frame inside the canvas to hold all content 
+            self.marwin_content_frame = tk.Frame(self.marwin_canvas)
+            self.marwin_canvas_window = self.marwin_canvas.create_window((0, 0), window=self.marwin_content_frame, anchor='nw')
+            # bind configure event to update scroll region
+            self.marwin_content_frame.bind('<Configure>', lambda e: self.marwin_canvas.configure(scrollregion=self.marwin_canvas.bbox('all')))
+            # 
+
+            self.marvs = marwin_specplotlib.HSIExplorer(self.marwin_content_frame)
             # buld frame to select dir and open Marwins specplotter
             self.mwframe = tk.Frame(self.load_content_frame, width=60, height=100, borderwidth=5, relief="ridge")
             self.mwframe.grid(row=1, column=1, padx=5, pady=5)
