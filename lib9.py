@@ -582,7 +582,7 @@ class XYMap:
         b_roi_hsi = tk.Button(frame, text="Plot ROI on HSI", command= lambda: self.roihandler.plot_roi_on_pixmatrix(
             self.PMdict[self.hsiselect.get()].PixMatrix, 
             self.roisel.get(), 
-            vis_type=roivistypeselect.get(), 
+            vis_type=self.roivistypeselect.get(), 
             color=roicolor.get(),
             title=self._get_hsi_title(self.hsiselect.get()), 
             unit=self.PMdict[self.hsiselect.get()].metadata['unit'] 
@@ -593,9 +593,13 @@ class XYMap:
         b_roi_hsi.grid(row=6, column=0)
         # select roi plot type
         tk.Label(frame, text="ROI Plot Type").grid(row=7, column=0)
-        roivistypeselect = ttk.Combobox(frame, values=['cornerlines', 'overlay'], width=15)
-        roivistypeselect.set(self.defentries['roi_vis_type']) # set default ROI plot type
-        roivistypeselect.grid(row=8, column=0)
+        linemodes = ['cornerlines', 'overlay']
+        self.roivistypeselect = ttk.Combobox(frame, values=linemodes, width=15)
+        selmode = self.defentries['roi_vis_type'] # remove , if selmode not in linemodes else linemodes[0]
+        if selmode not in linemodes:
+            selmode = linemodes[0]
+        self.roivistypeselect.set(selmode) # set default ROI plot type
+        self.roivistypeselect.grid(row=8, column=0)
 
         # entry to enter, what roi (indicees 1,2,3 should be plotted at once, use colors 1,2,3 for that)
         tk.Label(frame, text="Plot ROI indices (e.g. 1,2,3)").grid(row=9, column=0)
@@ -758,7 +762,7 @@ class XYMap:
         tk.Button(frame, text="Save Plot to File", command=self.save_hsi_plot_to_file,
                  bg='lightgreen').grid(row=16, column=0, columnspan=2, pady=5, padx=5, sticky=tk.EW)
     
-    def plot_multiple_rois_on_hsi(self):
+    def plot_multiple_rois_on_hsi(self, plotmode='cornerlines'):
         """Plot multiple ROIs on the selected HSI with different colors."""
         try:
             # Get selected HSI
@@ -795,8 +799,13 @@ class XYMap:
             #    color = color_options[i % len(color_options)]
             #    self.roihandler.plot_roi_on_pixmatrix(pixmatrix, roi_idx, vis_type=self.defentries.get('roi_vis_type', 'cornerlines'), color=color)
             #plot_multiple_rois_on_pixmatrix(self, handler, pixmatrix, roinames, plotmodes, colors, fontsize=14):
+            # get selected plotmode from ROI Plot Type combobox
+            selplotmode = self.roivistypeselect.get()
+            if selplotmode not in ['cornerlines', 'overlay']:
+                print(f'Warning: Invalid ROI plot mode "{selplotmode}". Defaulting to "cornerlines".')
+                selplotmode = defaultplotmode = self.defentries.get('roi_vis_type', 'cornerlines')
 
-            plotmodes = [self.defentries.get('roi_vis_type', 'cornerlines')] * len(roibynames)
+            plotmodes = [selplotmode] * len(roibynames)
             colors = [color_options[i % len(color_options)] for i in range(len(roibynames))]
             unit = 'Intensity'
             if hasattr(self.PMdict[hsi_name].metadata, 'unit'):
