@@ -9,6 +9,7 @@ from matplotlib.ticker import MaxNLocator
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import hilbert
+import sys
 
 
 # window functions
@@ -769,7 +770,7 @@ def calc_r_squared(fit, data): # args: data(observations), y_fit(model)
 
 # + is for ss_res, ss_tot, r_squared, pixstart, pixend, wlstart, wlend, fwhm, max_x, max_y
 addtofitparms = ['ss_res', 'ss_tot', 'r_squared', 'fwhm', 'pixstart', 'pixend', 'wlstart', 'wlend', 'max_x', 'max_y', 'fit_status'] # Note: this one is essential to exist
-unitstoaddfit = ['Counts', 'Counts', '', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', ''] # add further units to the array after r_squared
+unitstoaddfit = ['Counts',  'Counts', '', 'nm', 'nm', 'nm', 'nm', 'nm', 'nm', '', ''] # add further units to the array after r_squared
 # add further parameters to the array after r_squared
 def buildfitparas():
     fa = []
@@ -2729,33 +2730,94 @@ fitunits = {'lorentz': fitkeys['lorentz'][6][:]+ unitstoaddfit,
             'doublevoigt5params': fitkeys['doublevoigt5params'][6][:] + unitstoaddfit
             }
 
+def fitkeys_to_fitunits(fitkeys=getlistofallFitparameters(), fitunits=fitunits):
+    """
+    Create a dictionary mapping fit parameter names to their units.
+    
+    Parameters:
+    -----------
+    fitkeys : dict
+        Dictionary containing fit keys and their associated information.
+    fitunits : dict
+        Dictionary containing fit parameter units for each fit type.
+
+    Returns:
+    keys_to_units : dict
+        Dictionary mapping each fit parameter name to its corresponding unit.
+
+    mapping logic: 
+    for windowfunction + N: use N as fitunits[windowfunction][N] to get the unit for that parameter. Note, windowfunction can be more than one word, so use split(' ')[:-1] to get the windowfunction name + the suffix. Suffix can be N or addtofitparms element. for addtofitparams use the corresponding[i] unit from unitstoaddfit[i]
+    """
+    keys_to_units = {}
+    for fit_type, fit_info in fitkeys.items():
+        param_names = fit_info[5]  # List of parameter names
+        param_units = fit_info[6]  # List of parameter units
+        
+        for i, param_name in enumerate(param_names):
+            if i < len(param_units):
+                keys_to_units[param_name] = param_units[i]
+            else:
+                keys_to_units[param_name] = 'unknown'  # Fallback if unit is missing
+
+def testallunits(fitkeys=fitkeys, fitunits=fitunits):
+    """
+    Test that all fit parameters have corresponding units by printing fitkey:unit pairs.
+    
+    Parameters:
+    -----------
+    fitkeys : dict
+        Dictionary containing fit keys and their associated information.
+    fitunits : dict
+        Dictionary containing fit parameter units for each fit type.
+    Returns:
+    --------
+    None
+    """
+    for fit_type, fit_info in fitkeys.items():
+        param_names = fit_info[5]  # List of parameter names
+        param_units = fit_info[6]  # List of parameter units
+        
+        for i, param_name in enumerate(param_names):
+            if i < len(param_units):
+                unit = param_units[i]
+            else:
+                unit = 'unknown'
+            print(f"{param_name}: {unit}")
+
+
+
 # fitparametersparis: dict of the fit parameters and their units. Key of getlistofallFitparameters() is the key of the fitkeys dictionary
 # fitunitparis: dict of the fit parameters and their units. Key of getlist
 fitunitparis = {}
-all_fit_params = getlistofallFitparameters()
-for i in range(len(all_fit_params)):
+all_fit_params_packed = getlistofallFitparameters()
+all_fit_params = [item for sublist in all_fit_params_packed for item in sublist]  # Flatten the list of lists
+
+for i in range(len(all_fit_params_packed)):
     fit_type = list(fitkeys.keys())[i]
-    #print(i, fit_type, all_fit_params[i])
-    #for j, param_name in enumerate(all_fit_params[i]):
-    #    if j < fitkeys[fit_type][4]:  # Regular fit parameters
-    #        fitunitparis[param_name] = fitunits[fit_type][j]
-    #    else:  # Additional parameters (ss_res, ss_tot, etc.)
-    #        fitunitparis[param_name] = fitunits[fit_type][j]
+    for j, param_name in enumerate(all_fit_params_packed[i]):
+        if j < fitkeys[fit_type][4]:  # Regular fit parameters
+            fitunitparis[param_name] = fitunits[fit_type][j]
+        else:  # Additional parameters (ss_res, ss_tot, etc.)
+            fitunitparis[param_name] = fitunits[fit_type][j]
 
 if __name__ == '__main__':
     print('This is a library of window functions and their corresponding fit functions.')
     print('Use the fitkeys dictionary to access the functions.')
 
-    ''' print fit units:'''
+    ''' print fit units:
     print('Fit units:')
     for key in fitunits.keys():
         print(f"{key}: {fitunits[key]}")
-
+    '''
     print('Fit unit paris:')
     for key in fitunitparis.keys():
         print(f"{key}: {fitunitparis[key]}")
+
+    '''    
+    print('All fit parameters:')
+    print(all_fit_params)
     
-    ''' print fit parameters:
+
     print('Fit parameters:')
     for key in fitkeys.keys():
         print(f"{key}: {fitkeys[key][5]}")
@@ -2769,4 +2831,9 @@ if __name__ == '__main__':
     #print fit parameters:
     #print(getlistofallFitparameters())
     #print(len(getlistofallFitparameters()))
+
+    # run testallunits
+    #testallunits(fitkeys=all_fit_params, fitunits=fitunits) 
+
+    
     
