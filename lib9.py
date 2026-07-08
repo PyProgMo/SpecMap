@@ -2422,7 +2422,12 @@ class XYMap:
                 self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Spectrometer Counts')
             elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                 data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
-            self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL[self.aqpixstart: self.aqpixend], data, ['', self.fitkeys[self.selectwindowboxVari][3]], [self.SpecDataMatrix[y][x].fitdata[:-1]], [self.fitkeys[self.selectwindowboxVari][0]])
+            self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL[self.aqpixstart: self.aqpixend], 
+                                 data, 
+                                 ['', self.fitkeys[self.selectwindowboxVari][3]], 
+                                 [self.SpecDataMatrix[y][x].fitdata[:-1]], 
+                                 [self.fitkeys[self.selectwindowboxVari][0]]
+                                 )
 
     def PlotFitSpectrum(self, x, y, label, fitdata, fitfunc):
         self.readfontsize()
@@ -2434,14 +2439,15 @@ class XYMap:
         if self.sepfitfunct.get() == True:
             # plot double window function seperately
             if self.selectwindowboxVari == 'double gaussian':
-                plt.plot(x, matl.gaussianwind(x, fitfunc[0][0], fitfunc[0][1], fitfunc[0][2]), label='Gaussian 1', color='red')
-                plt.plot(x, matl.gaussianwind(x, fitfunc[0][3], fitfunc[0][4], fitfunc[0][5]), label='Gaussian 2', color='green')
+                print('Plotting double gaussian fit, fitdata:', fitdata)
+                plt.plot(x, matl.gaussianwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Gaussian 1', color='red')
+                plt.plot(x, matl.gaussianwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Gaussian 2', color='green')
             elif self.selectwindowboxVari == 'double lorentz':
-                plt.plot(x, matl.lorentzwind(x, fitfunc[0][0], fitfunc[0][1], fitfunc[0][2]), label='Lorentz 1', color='red')
-                plt.plot(x, matl.lorentzwind(x, fitfunc[0][3], fitfunc[0][4], fitfunc[0][5]), label='Lorentz 2', color='green')
+                plt.plot(x, matl.lorentzwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Lorentz 1', color='red')
+                plt.plot(x, matl.lorentzwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Lorentz 2', color='green')
             elif self.selectwindowboxVari == 'double voigt':
-                plt.plot(x, matl.voigtwind(x, fitfunc[0][0], fitfunc[0][1], fitfunc[0][2], fitfunc[0][3]), label='Voigt 1', color='red')
-                plt.plot(x, matl.voigtwind(x, fitfunc[0][4], fitfunc[0][5], fitfunc[0][6], fitfunc[0][7]), label='Voigt 2', color='green')
+                plt.plot(x, matl.voigtwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2], fitdata[0][3]), label='Voigt 1', color='red')
+                plt.plot(x, matl.voigtwind(x, fitdata[0][4], fitdata[0][5], fitdata[0][6], fitdata[0][7]), label='Voigt 2', color='green')
             else:
                 try:
                     for i in range(len(fitdata)):

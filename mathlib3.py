@@ -342,6 +342,68 @@ def fitdoublelorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
     amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit = fitdata
     return amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit, pcov
 
+def build_double_voigt_bounds_and_guess(x, y, delta_guess=30.0, delta_tol=15.0,
+                                          min_linewidth=1.0, max_linewidth=None):
+    """
+    Physically-informed bounds + initial guess for exciton/trion double-Voigt PL fits.
+
+    x, y        : spectral window (energy or wavelength, intensity)
+    delta_guess : expected exciton-trion splitting (meV or same units as x)
+    delta_tol   : how far the splitting is allowed to wander from delta_guess
+    min_linewidth : smallest physically plausible sigma/gamma (set by your
+                    spectrometer resolution -- don't let the fit go narrower
+                    than your instrument can actually resolve)
+    max_linewidth : largest plausible width; defaults to ~half the fit window
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    xmin, xmax = x.min(), x.max()
+    span = xmax - xmin
+    if max_linewidth is None:
+        max_linewidth = span / 2
+
+    # --- initial guess: locate the dominant peak, assume exciton is the
+    # higher-energy, higher-intensity peak (typical for MoSe2/WSe2 at low-moderate doping)
+    i_max = np.argmax(y)
+    cen1_guess = x[i_max]
+    amp1_guess = y[i_max]
+
+    cen2_guess = cen1_guess - delta_guess   # trion, red-shifted
+    # nearest index to that guess, for a local amplitude estimate
+    i2 = np.argmin(np.abs(x - cen2_guess))
+    amp2_guess = max(y[i2], 0.1 * amp1_guess)  # avoid zero/negative seed
+
+    width_guess = max(span / 20, min_linewidth * 2)  # rough starting width
+
+    initial_guess = [amp1_guess, cen1_guess, width_guess, width_guess,
+                      amp2_guess, cen2_guess, width_guess, width_guess]
+
+    # --- bounds
+    lower_bounds = [
+        0,                      # amp1 > 0
+        cen1_guess - span/4,    # cen1 stays near the dominant peak, not anywhere in window
+        min_linewidth,          # sigma1
+        0,                      # gamma1 (allow pure Gaussian)
+        0,                      # amp2 > 0
+        cen1_guess - delta_guess - delta_tol,  # cen2 tied to splitting range
+        min_linewidth,          # sigma2
+        0,                      # gamma2
+    ]
+    upper_bounds = [
+        np.inf,
+        cen1_guess + span/4,
+        max_linewidth,
+        max_linewidth,
+        np.inf,
+        cen1_guess - delta_guess + delta_tol,
+        max_linewidth,
+        max_linewidth,
+    ]
+
+    return initial_guess, (lower_bounds, upper_bounds)
+
+'''old stuff, now we add the new physically-informed bounds and guess function above
 def fitdoublevoigttospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
     y = PLB[start: end]
@@ -349,11 +411,32 @@ def fitdoublevoigttospec(start, end, WL, PLB, maxfev=10000, guess=None):
         initialguess = estimate_double_voigt_params(x, y)
     else:
         initialguess = guess[0:8]
+    
+    lower_bounds = [0, np.min(x), 0, 0, 0, np.min(x), 0, 0]  # Example lower bounds
+    upper_bounds = [np.inf, np.max(x), np.inf, np.inf, np.inf, np.max(x), np.inf, np.inf]  # Example upper bounds
+
     #[np.max(y), x[np.argmax(y)], np.std(x), np.std(x), np.max(y), x[np.argmax(y)], np.std(x), np.std(x)] old fit estimate
     fitdata, pcov = curve_fit(double_voigtwind, x, y, p0=initialguess, maxfev=maxfev,
                               # tighten fith convergence by setting bounds
                               ftol = 1e-10, xtol=1e-10, gtol=1e-10,
                               )
+    amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit = fitdata
+    return amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit, pcov
+'''
+def fitdoublevoigttospec(start, end, WL, PLB, maxfev=10000, guess=None,
+                          delta_guess=30.0, delta_tol=15.0, min_linewidth=1.0):
+    x = WL[start:end]
+    y = PLB[start:end]
+
+    initialguess, (lower_bounds, upper_bounds) = build_double_voigt_bounds_and_guess(
+        x, y, delta_guess=delta_guess, delta_tol=delta_tol, min_linewidth=min_linewidth
+    )
+    if guess is not None:
+        initialguess = guess[0:8]
+
+    fitdata, pcov = curve_fit(double_voigtwind, x, y, p0=initialguess, maxfev=maxfev,
+                               bounds=(lower_bounds, upper_bounds),
+                               ftol=1e-10, xtol=1e-10, gtol=1e-10)
     amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit = fitdata
     return amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit, pcov
 
@@ -628,8 +711,10 @@ def getdoublelorentzfwhm(fitparams):
     fwhm2 = 2 * wid2
     return fwhm1 + fwhm2
 
-def getdoublevoigtfwhm(xgrid, fitparams):
+def getdoublevoigtfwhm(fitparams):
     amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2 = fitparams
+    # generate xgrid using the centers and widths of the two peaks
+    xgrid = np.linspace(min(cen1 - 5 * wid1, cen2 - 5 * wid2), max(cen1 + 5 * wid1, cen2 + 5 * wid2), 1000)
 
     y = (
         voigtwind(xgrid, amp1, cen1, wid1, gamma1) +
