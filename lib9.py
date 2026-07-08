@@ -2446,8 +2446,10 @@ class XYMap:
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Lorentz 1', color='red')
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Lorentz 2', color='green')
             elif self.selectwindowboxVari == 'double voigt':
-                plt.plot(x, matl.voigtwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2], fitdata[0][3]), label='Voigt 1', color='red')
-                plt.plot(x, matl.voigtwind(x, fitdata[0][4], fitdata[0][5], fitdata[0][6], fitdata[0][7]), label='Voigt 2', color='green')
+                # hight version: voigt_height(x, amp, cen, fwhm, eta)
+                # width version: voigtwind(x, amp, cen, fwhm, eta)
+                plt.plot(x, matl.voigt_height(x, fitdata[0][0], fitdata[0][1], fitdata[0][2], fitdata[0][3]), label='Voigt 1', color='red')
+                plt.plot(x, matl.voigt_height(x, fitdata[0][4], fitdata[0][5], fitdata[0][6], fitdata[0][7]), label='Voigt 2', color='green')
             else:
                 try:
                     for i in range(len(fitdata)):
