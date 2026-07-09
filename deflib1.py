@@ -457,6 +457,9 @@ def iterative_cosmic_Matrix(SpectrumDataMatrix, thresh, width):
     
     return SpectrumDataMatrix_corrected
 
+def pca_anomaly(SpectrumData, thresh, width):
+    pass
+
 def pca_anomaly_Matrix(SpectrumDataMatrix, thresh, width):
     """
     PCA-based anomaly detection for cosmic rays.
@@ -693,9 +696,71 @@ def iterative_cosmic(data, thresh, width):
     
     return corrected.tolist() if isinstance(data, list) else corrected
 
-def pca_anomaly(data, thresh, width):
-    """Single spectrum PCA anomaly - needs multiple spectra for PCA."""
-    return data # Single spectrum version - not applicable
+def remove_cosmics_spacial(data, thresh, width):
+    """
+    Remove cosmics from a single spectrum using spatial information.
+    This is a placeholder for a method that would require neighboring spectra.
+    """
+    return data # Single spectrum version - no spatial correlation available
+
+def remove_cosmics_spacial_Matrix(SpectrumDataMatrix, threshold=5):
+    X = len(SpectrumDataMatrix)
+    Y = len(SpectrumDataMatrix[0])
+
+    for i in range(X):
+        for j in range(Y):
+            if not hasattr(SpectrumDataMatrix[i][j], 'PLB'):
+                continue
+
+            center = SpectrumDataMatrix[i][j].PLB.copy()
+
+            # collect 3x3 neighborhood
+            neigh = []
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    ni, nj = i + di, j + dj
+                    if 0 <= ni < X and 0 <= nj < Y:
+                        if hasattr(SpectrumDataMatrix[ni][nj], 'PLB'):
+                            neigh.append(SpectrumDataMatrix[ni][nj].PLB)
+
+            if len(neigh) < 3:
+                continue  # not enough stats
+
+            neigh = np.array(neigh)  # shape: (Nneigh, M)
+
+            # spatial median + std
+            med = np.median(neigh, axis=0)
+            std = np.std(neigh, axis=0)
+
+            # avoid division problems
+            std[std == 0] = 1e-12
+
+            # detect cosmics
+            mask = np.abs(center - med) > threshold * std
+
+            # replace only cosmics
+            center[mask] = med[mask]
+
+            SpectrumDataMatrix[i][j].PLB = center
+
+    return SpectrumDataMatrix
+
+def whitaker_hayes_despike(flux, threshold=7, window=5):
+    """Modified z-score despiking (Whitaker & Hayes 2018). https://doi.org/10.1016/j.chemolab.2018.06.009 """ 
+    diff = np.diff(flux, prepend=flux[0])          # emphasize sharp spikes
+    med = np.median(diff)
+    mad = np.median(np.abs(diff - med)) or 1e-12
+    mod_z = 0.6745 * (diff - med) / mad             # 0.6745 = MAD->sigma
+    spikes = np.abs(mod_z) > threshold
+
+    clean = flux.copy()
+    idx = np.arange(len(flux))
+    for i in np.where(spikes)[0]:
+        lo, hi = max(0, i - window), min(len(flux), i + window + 1)
+        good = ~spikes[lo:hi]
+        if good.sum() >= 2:
+            clean[i] = np.interp(i, idx[lo:hi][good], flux[lo:hi][good])
+    return clean#, spikes
 
 def gradient_based(data, thresh, width):
     """
@@ -1252,7 +1317,9 @@ cosmicfuncts = {
                 'Robust Median': robust_median,
                 'Iterative Cosmic': iterative_cosmic,
                 'PCA Anomaly': pca_anomaly,
-                'Gradient Based': gradient_based,
+                'Gradient Based': gradient_based, 
+                'spacial removal': remove_cosmics_spacial,
+                'withaker-hayes despike': whitaker_hayes_despike
                 } 
 
 # Correlation functions for cosmic ray removal must be run by XYMap class instead of SpectrumData class only
@@ -1266,6 +1333,7 @@ correlationcosmicfuncts = {
                 'Iterative Cosmic Matrix': iterative_cosmic_Matrix,
                 'PCA Anomaly Matrix': pca_anomaly_Matrix,
                 'Gradient Based Matrix': gradient_based_Matrix,
+                'spacial removal Matrix': remove_cosmics_spacial_Matrix,
                 }
 # Rolling Mean showed not to be good for cosmic removal
 # Spline Interpolation showed not to be good for cosmic removal and took like forever to perform

@@ -1814,7 +1814,7 @@ class XYMap:
         self.selectPixY.insert(0, str(self.newsely))
 
     # Max Counts Colormap
-    def buildandPlotIntCmap(self, savetoimage='False', plot=True, datatype='Spectrum (PL-BG)'):
+    def buildandPlotIntCmap(self, savetoimage='False', plot=True, datatype='Spectrum (PL-BG)', wlstart=None, wlend=None):
         hsi_name = self.hsiselect.get()
         if not hsi_name or hsi_name not in self.PMdict:
             print("No valid HSI selected to plot.")
@@ -1822,10 +1822,18 @@ class XYMap:
             
         self.readfontsize()
         self.updatecountthresh()
-        # update spec min and max values
+        # update spec min and max values # self.proc_spec_min
+        # if wlstart and wlend are provided, write them to self.proc_spec_min and self.proc_spec_max as entries
+        if wlstart is not None:
+            self.proc_spec_min.delete(0, tk.END)
+            self.proc_spec_min.insert(0, str(wlstart))
+        if wlend is not None:
+            self.proc_spec_max.delete(0, tk.END)
+            self.proc_spec_max.insert(0, str(wlend))
         self.updatewl()
         # create a new colormap by using the selected HSI
         lastpm = copy.deepcopy(self.PMdict[hsi_name].PixMatrix)
+        
         metadata = {}
         # set metadata for the new colormap
         if datatype in deflib.datatype2unit:

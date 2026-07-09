@@ -145,6 +145,10 @@ class Cube2ImageGUI:
         centerwl = float(self.start_slider.get())
         start = centerwl - float(self.width_slider.get()) / 2
         width = float(self.width_slider.get())
+        if start < self.wlstart:
+            start = self.wlstart
+        if start + width > self.wlend:
+            width = self.wlend - start
         
         self.start_val_label.config(text=f"{start:.1f}")
         self.width_val_label.config(text=f"{width:.1f}")
@@ -213,27 +217,18 @@ class Cube2ImageGUI:
         dt = self.datatype_map.get(dt_label)
         if not dt: return
 
-        wlstart = start
-        wlend = start + width
+        wlstart = start-width/2
+        wlend = start + width/2
 
         if hasattr(self.Nanomap, 'selectspecbox'):
             try:
                 self.Nanomap.selectspecbox.set(dt_label)
             except Exception:
                 pass
-        
-        if hasattr(self.Nanomap, 'proc_spec_min') and hasattr(self.Nanomap, 'proc_spec_max'):
-            try:
-                self.Nanomap.proc_spec_min.delete(0, tk.END)
-                self.Nanomap.proc_spec_min.insert(0, str(round(wlstart, 2)))
-                self.Nanomap.proc_spec_max.delete(0, tk.END)
-                self.Nanomap.proc_spec_max.insert(0, str(round(wlend, 2)))
-            except Exception:
-                pass
 
         if hasattr(self.Nanomap, 'buildandPlotIntCmap'):
             try:
-                self.Nanomap.buildandPlotIntCmap(savetoimage='False', plot=False, datatype=dt, wlstart=wlstart, wlend=wlend)
+                self.Nanomap.buildandPlotIntCmap(savetoimage='False', plot=False, datatype=dt, wlstart=round(wlstart, 2), wlend=round(wlend, 2))
                 self.update_plot()
             except Exception as e:
                 self._clear_plot()
