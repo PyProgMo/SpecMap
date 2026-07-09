@@ -20,6 +20,8 @@ class Cube2ImageGUI:
             self.zoomlen = float(zoomlen)
         except:
             self.zoomlen = 700.0
+        self.wlcenter = tk.DoubleVar(value=(self.wlend + self.wlstart) / 2)
+        self.wlwidth = tk.DoubleVar(value=10.0)
         self.root = root
         self.Nanomap = Nanomap
         self.colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds']
@@ -37,15 +39,15 @@ class Cube2ImageGUI:
         self.datatype_cb = ttk.Combobox(main_frame, textvariable=self.datatype_var)
         self.datatype_cb.grid(row=0, column=1, sticky='we')
         
-        # Start and Width sliders
+        # Center and Width sliders
         ttk.Label(main_frame, text='Integration Central WL (nm):').grid(row=1, column=0, sticky=tk.W)
-        self.start_slider = ttk.Scale(main_frame, from_=self.wlstart, to=self.wlend, value=(self.wlend-self.wlstart)/2, command=self.update_plot, length=self.zoomlen)
-        self.start_slider.grid(row=1, column=1, sticky='we')
-        self.start_val_label = ttk.Label(main_frame, text='500.0', width=8)
-        self.start_val_label.grid(row=1, column=2, sticky=tk.W)
+        self.center_slider = ttk.Scale(main_frame, from_=self.wlstart, to=self.wlend, variable=self.wlcenter, command=self.update_plot, length=self.zoomlen)
+        self.center_slider.grid(row=1, column=1, sticky='we')
+        self.center_val_label = ttk.Label(main_frame, text=f'{self.wlcenter.get():.1f}', width=8)
+        self.center_val_label.grid(row=1, column=2, sticky=tk.W)
         
         ttk.Label(main_frame, text='Wavelength Width (corresponding unit):').grid(row=2, column=0, sticky=tk.W)
-        self.width_slider = ttk.Scale(main_frame, from_=0.0, to=200, value=10, command=self.update_plot, length=self.zoomlen)
+        self.width_slider = ttk.Scale(main_frame, from_=0.0, to=200, variable=self.wlwidth, command=self.update_plot, length=self.zoomlen)
         self.width_slider.grid(row=2, column=1, sticky='we')
         self.width_val_label = ttk.Label(main_frame, text='10.0', width=8)
         self.width_val_label.grid(row=2, column=2, sticky=tk.W)
@@ -53,14 +55,14 @@ class Cube2ImageGUI:
         # Manual wavelength bounds
         manual_frame = ttk.Frame(main_frame)
         manual_frame.grid(row=3, column=0, columnspan=3, sticky='we', pady=(4, 0))
-        ttk.Label(manual_frame, text='WL Start:').grid(row=0, column=0, sticky=tk.W)
-        self.manual_wlstart_var = tk.StringVar(value=f'{self.wlstart:.2f}')
-        self.manual_wlstart_entry = ttk.Entry(manual_frame, textvariable=self.manual_wlstart_var, width=10)
-        self.manual_wlstart_entry.grid(row=0, column=1, sticky=tk.W, padx=(4, 10))
+        ttk.Label(manual_frame, text='WL Center:').grid(row=0, column=0, sticky=tk.W)
+        self.manual_wlcenter_var = tk.StringVar(value=f'{self.wlcenter.get():.2f}')
+        self.manual_wlcenter_entry = ttk.Entry(manual_frame, textvariable=self.manual_wlcenter_var, width=10)
+        self.manual_wlcenter_entry.grid(row=0, column=1, sticky=tk.W, padx=(4, 10))
         ttk.Label(manual_frame, text='WL width:').grid(row=0, column=2, sticky=tk.W)
         self.manual_wl_width_var = tk.StringVar(value='10.00')
-        self.manual_wlend_entry = ttk.Entry(manual_frame, textvariable=self.manual_wl_width_var, width=10)
-        self.manual_wlend_entry.grid(row=0, column=3, sticky=tk.W, padx=(4, 10))
+        self.manual_wlwidth_entry = ttk.Entry(manual_frame, textvariable=self.manual_wl_width_var, width=10)
+        self.manual_wlwidth_entry.grid(row=0, column=3, sticky=tk.W, padx=(4, 10))
         self.set_wl_button = ttk.Button(manual_frame, text='Set WL', command=self.set_manual_wavelengths)
         self.set_wl_button.grid(row=0, column=4, sticky=tk.W)
 
@@ -140,18 +142,29 @@ class Cube2ImageGUI:
         if title:
             self.ax.set_title(title)
         self.canvas.draw_idle()
+
+    def _centered_bounds(self, centerwl, width):
+        width = max(0.0, min(float(width), self.wlend - self.wlstart))
+        half_width = width / 2.0
+        min_center = self.wlstart + half_width
+        max_center = self.wlend - half_width
+        if min_center <= max_center:
+            centerwl = min(max(centerwl, min_center), max_center)
+        else:
+            centerwl = (self.wlstart + self.wlend) / 2.0
+        start = centerwl - half_width
+        end = centerwl + half_width
+        return centerwl, width, start, end
     
     def update_plot(self, *args):
-        centerwl = float(self.start_slider.get())
-        start = centerwl - float(self.width_slider.get()) / 2
-        width = float(self.width_slider.get())
-        if start < self.wlstart:
-            start = self.wlstart
-        if start + width > self.wlend:
-            width = self.wlend - start
+        centerwl = float(self.wlcenter.get())
+        width = float(self.wlwidth.get())
+        centerwl, width, start, end = self._centered_bounds(centerwl, width)
         
-        self.start_val_label.config(text=f"{start:.1f}")
+        self.center_val_label.config(text=f"{centerwl:.1f}")
         self.width_val_label.config(text=f"{width:.1f}")
+        self.wlcenter.set(centerwl)
+        self.wlwidth.set(width)
 
         if not self.Nanomap:
             self._clear_plot()
@@ -167,14 +180,14 @@ class Cube2ImageGUI:
         try:
             wl = getattr(self.Nanomap.SpecDataMatrix[0][0], 'WL', None)
             if wl is not None:
-                idx = np.where((wl >= start) & (wl <= start + width))[0]
+                idx = np.where((wl >= start) & (wl <= end))[0]
                 img = np.zeros((len(self.Nanomap.SpecDataMatrix), len(self.Nanomap.SpecDataMatrix[0])))
                 for i in range(img.shape[0]):
                     for j in range(img.shape[1]):
                         data = getattr(self.Nanomap.SpecDataMatrix[i][j], dt, np.zeros_like(wl))
                         img[i, j] = np.sum(data[idx])
                 
-                self._draw_image(img, title=f'{dt_label}: {start:.1f} - {start + width:.1f} nm')
+                self._draw_image(img, title=f'{dt_label}: {start:.1f} - {end:.1f} nm')
                 return
         except Exception as e:
             self._clear_plot()
@@ -189,7 +202,7 @@ class Cube2ImageGUI:
 
     def set_manual_wavelengths(self):
         try:
-            wlstart = round(float(self.manual_wlstart_var.get()), 2)
+            wlcenter = round(float(self.manual_wlcenter_var.get()), 2)
             wlwidth = round(float(self.manual_wl_width_var.get()), 2)
         except Exception:
             self._clear_plot()
@@ -197,19 +210,17 @@ class Cube2ImageGUI:
             self.canvas.draw_idle()
             return
 
-        wlstart = max(self.wlstart, min(self.wlend, wlstart))
-        max_width = max(0.0, self.wlend - wlstart)
-        wlwidth = max(0.0, min(max_width, wlwidth))
+        wlcenter, wlwidth, _, _ = self._centered_bounds(wlcenter, wlwidth)
 
-        self.manual_wlstart_var.set(f'{wlstart:.2f}')
+        self.manual_wlcenter_var.set(f'{wlcenter:.2f}')
         self.manual_wl_width_var.set(f'{wlwidth:.2f}')
-        self.start_slider.set(wlstart)
+        self.center_slider.set(wlcenter)
         self.width_slider.set(wlwidth)
         self.update_plot()
     
     def createHSI(self):
 
-        start = float(self.start_slider.get())
+        centerwl = float(self.center_slider.get())
         width = float(self.width_slider.get())
 
         if not self.Nanomap: return
@@ -217,8 +228,11 @@ class Cube2ImageGUI:
         dt = self.datatype_map.get(dt_label)
         if not dt: return
 
-        wlstart = start-width/2
-        wlend = start + width/2
+        centerwl, width, wlstart, wlend = self._centered_bounds(centerwl, width)
+        self.center_slider.set(centerwl)
+        self.width_slider.set(width)
+        self.manual_wlcenter_var.set(f'{centerwl:.2f}')
+        self.manual_wl_width_var.set(f'{width:.2f}')
 
         if hasattr(self.Nanomap, 'selectspecbox'):
             try:
@@ -239,20 +253,21 @@ class Cube2ImageGUI:
     def update_bounds(self, wlstart, wlend):
         self.wlstart = wlstart
         self.wlend = wlend
-        self.start_slider.config(from_=self.wlstart, to=self.wlend, length=self.zoomlen)
-        self.start_slider.set((self.wlend - self.wlstart) / 2)
+        self.center_slider.config(from_=self.wlstart, to=self.wlend, length=self.zoomlen)
+        self.center_slider.set((self.wlend + self.wlstart) / 2)
+        self.manual_wlcenter_var.set(f'{(self.wlend + self.wlstart) / 2:.2f}')
         self.update_plot()
     
     def destroy(self):
         # clean up the GUI resources
         try:
-            self.start_slider.destroy()
+            self.center_slider.destroy()
             self.width_slider.destroy()
             self.datatype_cb.destroy()
-            self.start_val_label.destroy()
+            self.center_val_label.destroy()
             self.width_val_label.destroy()
-            self.manual_wlstart_entry.destroy()
-            self.manual_wlend_entry.destroy()
+            self.manual_wlcenter_entry.destroy()
+            self.manual_wlwidth_entry.destroy()
             self.set_wl_button.destroy()
         except Exception:
             pass
@@ -337,19 +352,32 @@ def testgui():
     
     # Create a dummy Nanomap with necessary attributes for testing
     class DummySpec:
-        def __init__(self):
+        def __init__(self, spec=None):
             self.WL = np.linspace(400, 700, 100)
-            self.Spectrum1 = np.random.rand(100)
-            self.Spectrum2 = np.random.rand(100)
+            if spec is not None:
+                self.PLB = np.random.rand(100)
+            elif spec == 'gaussian':
+                # gaussian peak for testing
+                self.PLB = np.exp(-0.5 * ((self.WL - 550) / 20) ** 2)
+            elif spec == 'lorentzian':
+                # lorentzian peak for testing
+                self.PLB = 1 / (1 + ((self.WL - 600) / 10) ** 2)
+            elif spec == 'sine':
+                # sine wave for testing
+                self.PLB = 1
     
     class DummyNanomap:
         def __init__(self):
-            self.speckeys = ['Spectrum1', 'Spectrum2']
-            self.SpecDataMatrix = [[DummySpec() for _ in range(5)] for _ in range(5)]
+            self.speckeys = ['Spectrum1', 'Spectrum2', 'Spectrum3', 'Spectrum4']
+            self.specs = [DummySpec(spec='gaussian'), DummySpec(spec='lorentzian'), DummySpec(spec='sine'), DummySpec()]
+            # test: print the spectra
+            self.SpecDataMatrix = [[spec for spec in self.specs] for _ in range(4)]
+            # for testing: print the spectra of the first pixel
     
     nanomap = DummyNanomap()
     
     cube2image_gui = Cube2Image(Nanomap=nanomap, guiroot=root)
+    cube2image_gui.update_bounds()  # Update bounds based on DummyNanomap
     
     # bind the close event to ensure proper cleanup
     def on_closing():
