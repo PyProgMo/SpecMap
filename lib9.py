@@ -614,7 +614,7 @@ class XYMap:
     
         # build second clumn for ROI
         tk.Label(frame, text="Select HSI Image").grid(row=0, column=1)
-        self.hsiselect = ttk.Combobox(frame)
+        self.hsiselect = ttk.Combobox(frame, width=40)
         self.hsiselect.grid(row=1, column=1)
         b4 = tk.Button(frame, text="Plot HSI", command= lambda: self.plotPixelMatrix(self.hsiselect.get())) # original command
                        # test
@@ -996,6 +996,13 @@ class XYMap:
                         for val in row
                     ]
                     f.write(';'.join(formatted_row) + '\n')
+    
+    def send_to_HSIPlot(self, hsiplotinstance):
+        selhsi = self.hsiselect.get()
+        if selhsi in self.PMdict.keys():
+            hsiplotinstance.set_hsi_data(self.PMdict[selhsi].PixMatrix, self.PMdict[selhsi].metadata)
+        # tk: switch to HSI Plot tab
+        self.tab_control.select(self.tab_hsiplot)
     
     def exportHSIWithSpectra(self):
         """
@@ -1840,13 +1847,13 @@ class XYMap:
             metadata['unit'] = deflib.datatype2unit[datatype]
             metadata['quantity'] = 'signal'
             metadata['fitmodel'] = None
-            metadata['fitparams'] = None
+            metadata['fitparameter'] = None
         else: 
             metadata['unit'] = 'A. U.'
             metadata['quantity'] = 'signal'
             metadata['fitmodel'] = None
-            metadata['fitparams'] = None
-        newpm = self.writetopixmatrix(lastpm, None, metadata=metadata)
+            metadata['fitparameter'] = None
+        newpm = self.writetopixmatrix(lastpm, None, metadata=metadata, method='Integrated')
         self.getPLpixelIntervalMaxIndex(self.PMdict[newpm].PixMatrix, False)
         
         # Apply normalization if enabled
@@ -1871,7 +1878,19 @@ class XYMap:
         self.updatecountthresh()
         self.readfontsize()
         lastpm = copy.deepcopy(self.PMdict[hsi_name].PixMatrix)
-        newpm = self.writetopixmatrix(lastpm, None)#str(self.selectspecpixbox.get()))
+        # before create newpm: create meatadata
+        metadata = {}
+        if self.selectwindowbox.get() in matl.fitkeys:
+            metadata['unit'] = 'nm'
+            metadata['quantity'] = 'wavelength'
+            metadata['fitmodel'] = self.selectwindowbox.get()
+            metadata['fitparameter'] = None
+        else:
+            metadata['unit'] = 'A. U.'
+            metadata['quantity'] = 'signal'
+            metadata['fitmodel'] = None
+            metadata['fitparameter'] = None
+        newpm = self.writetopixmatrix(lastpm, metadata=metadata, method='spectral_shift')#str(self.selectspecpixbox.get()))
         if self.HSI_fit_useROI.get() == False:
             self.fittoMatrixfitparams(self.PMdict[newpm].PixMatrix, 'fitmaxX', mode='fullHSI', roi=None)
         else:
@@ -3248,20 +3267,23 @@ class XYMap:
         )
         return(PixelMatrix, SpectralMatrix, matpixax, matpiyax)
     
-    def writetopixmatrix(self, matrix, name=None, metadata=None):
+    def writetopixmatrix(self, matrix, name=None, metadata=None, method='Integrated'):
         # selected dataset = self.PMdict[self.hsiselect.get()]
 
         if name == None or name not in self.PMdict.keys():
             # Get suffix from selected data set (Select Data Set)
-            suffix = ""
-            if hasattr(self, 'selectspecpixbox'):
+            suffix = ''
+            if method == 'Integrated' or method == 'spectral_shift':
                 val = self.selectspecpixbox.get()
                 # Use short code from speckeys if available, else sanitize value
                 short_code = self.speckeys.get(val, val)
-                suffix = f"_{short_code}".replace(" ", "_").replace("(", "").replace(")", "")
+                suffix = f"{short_code}_{method}".replace(" ", "_").replace("(", "").replace(")", "")
 
             # Use monotonically increasing counter for unique HSI names
-            newpmname = f'HSI{self._hsi_counter}{suffix}'
+            elif 'fitparameter' in metadata:
+                if metadata['fitparameter'] != '':
+                    suffix = f"{metadata['fitparameter'].replace(" ", "_").replace("(", "").replace(")", "")}_{method}"
+            newpmname = f'HSI{self._hsi_counter}_{suffix}'
             self._hsi_counter += 1
         else: 
             newpmname = name
@@ -3274,7 +3296,7 @@ class XYMap:
         'fitmodel':'', 
         'fitparameter': ''
         }
-        if metadata is not None:
+        if metadata != {}:
             for i in metadata:
                 self.PMdict[newpmname].metadata[i] = metadata[i]
 
@@ -3305,7 +3327,7 @@ class XYMap:
             'fitparameter': self.selectfitparambox.get() if self.selectfitparambox.get() != '' else 'failed to get fitparameter in plotHSIfromfitparam'
         }
 
-        newpm = self.writetopixmatrix(lastpm, metadata=metadata)
+        newpm = self.writetopixmatrix(lastpm, metadata=metadata, method=metadata['fitparameter'])
         self.getPLpixelIntervalMaxIndex(self.PMdict[newpm].PixMatrix, False)
 
         roi = lastpm[:]
