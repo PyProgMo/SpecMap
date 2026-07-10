@@ -2,7 +2,7 @@
 import csv
 import tkinter as tk
 from tkinter import filedialog
-import array_plotclass1 as apc
+import src.array_plotclass1 as apc
 
 class Exportframe():
     def __init__(self, Notebook, Nanomap) -> None:

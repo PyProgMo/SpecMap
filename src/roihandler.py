@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from matplotlib.colors import ListedColormap
 from matplotlib.colors import to_rgba
-import deflib1 as deflib
+import src.deflib1 as deflib
 
 class Roihandler():
     def __init__(self, roilist={}, pixmatrix=[[]], cmap='viridis'):

@@ -15,17 +15,16 @@ from scipy.special import wofz
 from tkinter import filedialog as tkfd
 import threading as thre
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import mathlib3 as matl # type: ignore
-import deflib1 as deflib # type: ignore
-import PMclasslib1 as PMlib # type: ignore
+import src.mathlib3 as matl # type: ignore
+import src.deflib1 as deflib # type: ignore
+import src.PMclasslib1 as PMlib # type: ignore
 import os, gc
 import traceback
-import error_handler  # Centralized error handling and logging
-import hsi_normalization  # HSI normalization module
-import memory_tracker  # Memory tracking and logging
-import copy, roihandler
-import traceback
-
+import src.error_handler as error_handler  # Centralized error handling and logging
+import src.hsi_normalization as hsi_normalization  # HSI normalization module
+import src.memory_tracker as memory_tracker  # Memory tracking and logging
+import src.roihandler as roihandler 
+import copy
 
 SpectDataFloats = ['Slit Width (µm)', 'Central Wavelength (nm)',
                    'Cooling Temperature (°C)',

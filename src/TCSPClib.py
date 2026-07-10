@@ -2,9 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 import tkinter as tk
-import deflib1 as deflib
-import export1 as exportlib
-import mathlib3 as mathlib
+import src.deflib1 as deflib
+import src.export1 as exportlib
+import src.mathlib3 as mathlib
 import matplotlib.pyplot as plt
 
 class TCSPCprocessor:

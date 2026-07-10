@@ -5,21 +5,21 @@ from matplotlib.figure import Figure
 #from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 import os, sys, pickle, re
 from PIL import Image, ImageTk
-import lib9 as lib # type: ignore
+import src.lib9 as lib # type: ignore
 import numpy as np
-import deflib1 as deflib
-import claralib1 as claralib
-import export2 as xplib
-import newtonspeclib1 as newtonlib
+import src.deflib1 as deflib1
+import src.claralib as claralib
+import src.export2 as xplib
+import src.newtonspeclib1 as newtonlib
 import threading as thr
 import matplotlib.pyplot as plt
-import HSI_debugger as DBG
-import TCSPClib as tcspclib
+import src.HSI_debugger as DBG
+import src.TCSPClib as tcspclib
 import shutil, gc
-import error_handler  # Centralized error handling and logging
+import src.error_handler as error_handler  # Centralized error handling and logging
 import datetime as datet
-import plotspecs
-import cube2image
+import src.plotspecs as plotspecs
+import src.cube2image as cube2image
 try:
     import marwin_specplot.marwin_specplot1 as marwin_specplotlib
     importmarwin = True
@@ -41,7 +41,7 @@ class FileProcessorApp:
         self.derivative_polynomarray = [None, None, None, None]  # Placeholder for derivative settings
         self._is_closing = False
         self.createmenue()
-        self.windownotebook(deflib.Notebooks)
+        self.windownotebook(deflib1.Notebooks)
         # init XYMap GUI components
         
         self.createbuttons(self.nodeframes['Load Data'])
@@ -89,7 +89,7 @@ class FileProcessorApp:
         self.Nanomap = lib.XYMap(
             [], self.cmapframe, self.specframe, 
             False, False, False, 
-            20, 3, list(deflib.cosmicfuncts.keys())[0], 
+            20, 3, list(deflib1.cosmicfuncts.keys())[0], 
             self.defaults, self.derivative_polynomarray,
             self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool
         )
@@ -113,7 +113,7 @@ class FileProcessorApp:
         # Create the menu bar
         menu_bar = tk.Menu(root)
         self.root.config(menu=menu_bar)
-        deflib.create_menu(self.root, menu_bar)
+        deflib1.create_menu(self.root, menu_bar)
     
     def windownotebook(self, notebookentries):
         # Create a notebook widget
@@ -179,7 +179,7 @@ class FileProcessorApp:
         self.folder_entry = tk.Entry(self.open_frame)
         self.folder_entry.pack(fill=tk.X)
         self.folder_entry.insert(0, defaults['data_file'])
-        self.folder_button = tk.Button(self.open_frame, text="Browse", command=lambda: deflib.browse_folder(self.folder_entry))
+        self.folder_button = tk.Button(self.open_frame, text="Browse", command=lambda: deflib1.browse_folder(self.folder_entry))
         self.folder_button.pack()
         # Filename input
         self.filename_label = tk.Label(self.open_frame, text="Enter Filename")
@@ -237,20 +237,20 @@ class FileProcessorApp:
         self.multiple_HSIs_dir_entry = tk.Entry(self.multiple_HSIs_inp_frame, width=80)
         self.multiple_HSIs_dir_entry.grid(row=2, column=1)
         self.multiple_HSIs_dir_entry.insert(0, defaults['hsifilesorter_maindir'])
-        self.Browse_multiple_HSIs_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib.browse_folder(self.multiple_HSIs_dir_entry))
+        self.Browse_multiple_HSIs_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib1.browse_folder(self.multiple_HSIs_dir_entry))
         self.Browse_multiple_HSIs_dir_button.grid(row=2, column=2)
         # save directory to save the HSI output images
         tk.Label(self.multiple_HSIs_inp_frame, text="Save Images Directory:").grid(row=3, column=0)
         self.multiple_HSIs_save_dir_entry = tk.Entry(self.multiple_HSIs_inp_frame, width=80)
         self.multiple_HSIs_save_dir_entry.grid(row=3, column=1)
         self.multiple_HSIs_save_dir_entry.insert(0, defaults['hsifilesorter_savedir'])
-        self.Browse_multiple_HSIs_save_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib.browse_folder(self.multiple_HSIs_save_dir_entry))
+        self.Browse_multiple_HSIs_save_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib1.browse_folder(self.multiple_HSIs_save_dir_entry))
         self.Browse_multiple_HSIs_save_dir_button.grid(row=3, column=2)
         # save directory for multiple HSI objects if save multiple HSIs checkbox is selected
         tk.Label(self.multiple_HSIs_inp_frame, text="Save HSI objects Directory:").grid(row=4, column=0)
         self.multiple_HSIs_save_pkl_dir_entry = tk.Entry(self.multiple_HSIs_inp_frame, width=80)
         self.multiple_HSIs_save_pkl_dir_entry.grid(row=4, column=1)
-        self.Browse_hsiobject_save_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib.browse_folder(self.multiple_HSIs_save_pkl_dir_entry)).grid(row=4, column=2)
+        self.Browse_hsiobject_save_dir_button = tk.Button(self.multiple_HSIs_inp_frame, text="Browse", command=lambda: deflib1.browse_folder(self.multiple_HSIs_save_pkl_dir_entry)).grid(row=4, column=2)
 
         # Cosmic removal
         # add extra frame for cosmic removal onto loadframe
@@ -261,9 +261,9 @@ class FileProcessorApp:
         self.removecosmics = tk.Checkbutton(self.cosmicframe, text="Remove Cosmics", variable=self.removecosmicsBool)
         self.removecosmics.grid(row=0, column=0)
         tk.Label(self.cosmicframe, text="Cosmic Removal function:").grid(row=1, column=0)
-        self.cosmicremoval = ttk.Combobox(self.cosmicframe, values=list(deflib.cosmicfuncts.keys()), width=20)
+        self.cosmicremoval = ttk.Combobox(self.cosmicframe, values=list(deflib1.cosmicfuncts.keys()), width=20)
         self.cosmicremoval.grid(row=1, column=1)
-        self.cosmicremoval.set(list(deflib.cosmicfuncts.keys())[0])
+        self.cosmicremoval.set(list(deflib1.cosmicfuncts.keys())[0])
         tk.Label(self.cosmicframe, text="Cosmic Threshold:").grid(row=2, column=0)
         self.cosmicthresholdentry = tk.Entry(self.cosmicframe, width=10)
         self.cosmicthresholdentry.grid(row=3, column=0)
@@ -352,7 +352,7 @@ class FileProcessorApp:
             self.marwin_folder_entry.pack(fill=tk.X)
 
             # add Browse and load buttons
-            self.marwin_folder_button = tk.Button(self.mwframe, text="Browse", command=lambda: deflib.browse_folder(self.marwin_folder_entry))
+            self.marwin_folder_button = tk.Button(self.mwframe, text="Browse", command=lambda: deflib1.browse_folder(self.marwin_folder_entry))
             self.marwin_folder_button.pack(side=tk.LEFT, padx=5)
             self.marwin_load_button = tk.Button(self.mwframe, text="Load Marwins Plotter", command=lambda: self.marvs.load_dataset(self.marwin_folder_entry.get()))
             self.marwin_load_button.pack(side=tk.LEFT, padx=5)
@@ -381,7 +381,7 @@ class FileProcessorApp:
         self.cl_scaling.pack(side=tk.LEFT, anchor='center')
         self.cl_scaling.set(list(claralib.cl_scalings.keys())[0])
         # Process button
-        self.cl_folder_button = tk.Button(self.claraloadframe, text="Browse", command= lambda: deflib.select_file(self.cl_file_entrystr))
+        self.cl_folder_button = tk.Button(self.claraloadframe, text="Browse", command= lambda: deflib1.select_file(self.cl_file_entrystr))
         self.cl_folder_button.pack(side=tk.RIGHT, anchor='center')
 
         # frame to save the current hsi object (now inside load_content_frame)
@@ -441,7 +441,7 @@ class FileProcessorApp:
         self.newton_file_entry.insert(0, defaults['newton_spectrum'])
         self.newton_process_button = tk.Button(self.newtonframe, text="Load Newton data", command=self.newtonloadfiles)
         self.newton_process_button.grid(row=2, column=1)
-        self.newton_folder_button = tk.Button(self.newtonframe, text="Browse", command= lambda: deflib.select_file(self.newton_file_entrystr))
+        self.newton_folder_button = tk.Button(self.newtonframe, text="Browse", command= lambda: deflib1.select_file(self.newton_file_entrystr))
         self.newton_folder_button.grid(row=1, column=3)
 
         # frame to load TCSPC data (now inside load_content_frame)
@@ -463,7 +463,7 @@ class FileProcessorApp:
         self.tcspc_subdir_entry.grid(row=2, column=1)
         self.tcspc_process_button = tk.Button(self.tcspcframe, text="Load TCSPC data", command=self.tcspcloadfiles)
         self.tcspc_process_button.grid(row=3, column=1)
-        self.tcspc_folder_button = tk.Button(self.tcspcframe, text="Browse", command= lambda: deflib.select_folder(self.tcspc_maindir_entrystr))
+        self.tcspc_folder_button = tk.Button(self.tcspcframe, text="Browse", command= lambda: deflib1.select_folder(self.tcspc_maindir_entrystr))
         self.tcspc_folder_button.grid(row=1, column=3)
 
         self.TCSPC_Processor = tcspclib.TCSPCprocessor(self.nodeframes['TCSPC'], self.tcspc_maindir_entry, self.tcspc_subdir_entry)
@@ -694,7 +694,7 @@ class FileProcessorApp:
             pass
         
         # Re-initialize defaults and read input fields
-        self.defaults = deflib.initdefaults()
+        self.defaults = deflib1.initdefaults()
         folder = self.folder_entry.get()
         filename = self.filename_entry.get()
         fileend = self.fileformat_entry.get()
@@ -809,7 +809,7 @@ class FileProcessorApp:
             if scaling in claralib.cl_scalings.keys():
                 dx = claralib.cl_scalings[scaling]
                 dy = claralib.cl_scalings[scaling]
-            self.claraimage = claralib.imageprocessor(self.nodeframes['Clara Image'], file, deflib.loadclaraimage, None, dx, dy)# 0.568, 0.568) 100x scaling
+            self.claraimage = claralib.imageprocessor(self.nodeframes['Clara Image'], file, deflib1.loadclaraimage, None, dx, dy)# 0.568, 0.568) 100x scaling
         except Exception as error:
             print("Error", "Could not load Clara image. {}".format(error))
     
@@ -860,7 +860,7 @@ class FileProcessorApp:
         
         # Handle file already exists
         if os.path.exists(filename):
-            filename = deflib.increment_filename(filename)
+            filename = deflib1.increment_filename(filename)
             print(f"Saving to: {filename}")
         
         # Call the XYMap save_state method
@@ -905,7 +905,7 @@ class FileProcessorApp:
             self.Nanomap = lib.XYMap(
                 [], self.cmapframe, self.specframe, 
                 False, False, False, 
-                20, 3, list(deflib.cosmicfuncts.keys())[0], 
+                20, 3, list(deflib1.cosmicfuncts.keys())[0], 
                 self.defaults, self.derivative_polynomarray,
                 self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool,
                 skip_gui_build=True  # Don't build GUI yet - will build after loading data
@@ -1003,7 +1003,7 @@ class specfilesorter:
         tk.Label(left, text="Main directory:").grid(row=0, column=0, sticky='w')
         self.maindir_entry = tk.Entry(left, textvariable=self.maindir_entrystr, width=63)
         self.maindir_entry.grid(row=1, column=0, columnspan=4, sticky='w')
-        tk.Button(left, text="Browse...", command=lambda: deflib.browse_folder(self.maindir_entry)).grid(row=1, column=2, padx=4)
+        tk.Button(left, text="Browse...", command=lambda: deflib1.browse_folder(self.maindir_entry)).grid(row=1, column=2, padx=4)
 
         # Filename pattern
         tk.Label(left, text="Filename contains:").grid(row=2, column=0, sticky='w', pady=(8, 0))
@@ -1019,13 +1019,13 @@ class specfilesorter:
         tk.Label(left, text="Save directory:").grid(row=4, column=0, sticky='w', pady=(8, 0))
         self.savedir_entry = tk.Entry(left, textvariable=self.savedir_entrystr, width=63)
         self.savedir_entry.grid(row=5, column=0, columnspan=4, sticky='w')
-        tk.Button(left, text="Browse...", command=lambda: deflib.browse_folder(self.savedir_entry)).grid(row=5, column=2, padx=4)
+        tk.Button(left, text="Browse...", command=lambda: deflib1.browse_folder(self.savedir_entry)).grid(row=5, column=2, padx=4)
 
         # Process dir (where merged/processed folders are written)
         tk.Label(left, text="Process directory:").grid(row=6, column=0, sticky='w', pady=(8, 0))
         self.processdir_entry = tk.Entry(left, textvariable=self.processdir_entrystr, width=63)
         self.processdir_entry.grid(row=7, column=0, columnspan=4, sticky='w')
-        tk.Button(left, text="Browse...", command=lambda: deflib.browse_folder(self.processdir_entry)).grid(row=7, column=2, padx=4)
+        tk.Button(left, text="Browse...", command=lambda: deflib1.browse_folder(self.processdir_entry)).grid(row=7, column=2, padx=4)
 
         # Options
         tk.Checkbutton(left, text="Merge consecutive days", variable=self.merge_var).grid(row=8, column=0, columnspan=2, sticky='w', pady=(8, 0))
@@ -1441,7 +1441,7 @@ if __name__ == "__main__":
     # Create the main window
 
     # default values for GUI
-    defaults = deflib.initdefaults()
+    defaults = deflib1.initdefaults()
     print('Starting...')
 
     root = tk.Tk()
