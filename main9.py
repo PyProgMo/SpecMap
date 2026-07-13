@@ -5,21 +5,21 @@ from matplotlib.figure import Figure
 #from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 import os, sys, pickle, re
 from PIL import Image, ImageTk
-import src.lib9 as lib # type: ignore
+import lib9 as lib # type: ignore
 import numpy as np
-import src.deflib1 as deflib1
-import src.claralib as claralib
-import src.export2 as xplib
-import src.newtonspeclib1 as newtonlib
+import deflib1 as deflib1
+import claralib as claralib
+import export2 as xplib
+import newtonspeclib1 as newtonlib
 import threading as thr
 import matplotlib.pyplot as plt
-import src.HSI_debugger as DBG
-import src.TCSPClib as tcspclib
+import HSI_debugger as DBG
+import TCSPClib as tcspclib
 import shutil, gc
-import src.error_handler as error_handler  # Centralized error handling and logging
+import error_handler as error_handler  # Centralized error handling and logging
 import datetime as datet
-import src.plotspecs as plotspecs
-import src.cube2image as cube2image
+import plotspecs as plotspecs
+import cube2image as cube2image
 try:
     import marwin_specplot.marwin_specplot1 as marwin_specplotlib
     importmarwin = True
