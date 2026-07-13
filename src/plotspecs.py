@@ -39,6 +39,7 @@ class Specplottergui:
         self.Specdata = Specdata
         self.Specdiffsets = Specdiffsets
         self.guiroot = guiroot
+        # defaultsfile = dir of this file/defaultsfile
         self.defaultsfile = defaultsfile
         self.defaults = self._load_defaults()
         

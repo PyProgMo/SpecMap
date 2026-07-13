@@ -104,6 +104,8 @@ class FileProcessorApp:
             Specdiffsets={}, 
             guiroot=self.nodeframes['Plot Spectra'],
             disspecs=self.Nanomap.disspecs
+            # dir_of_this_script/defaultsfdefaults_specplotterfile
+            defaultsfile= os.path.join(os.path.dirname(__file__), 'defaults_specplotter.txt')
             )
         
         # build the cube2image notebook
