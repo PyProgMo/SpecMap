@@ -633,6 +633,9 @@ class XYMap:
         b9 = tk.Button(frame, text="Export HSI to .csv", command= lambda: self.exportHSI())
         b9.grid(row=7, column=1)
 
+        b10 = tk.Button(frame, text="Export HSI to .itx", command= lambda: self.exportHSI_itx())
+        b10.grid(row=8, column=1)
+
         # build third column for Spectral Data
         tk.Label(frame, text="Select Spectral Data").grid(row=0, column=2)
         self.specselect = ttk.Combobox(frame, width=40)
@@ -995,6 +998,45 @@ class XYMap:
                         for val in row
                     ]
                     f.write(';'.join(formatted_row) + '\n')
+    
+    def exportHSI_itx(self): # export the selected HSI to a .itx file
+        '''
+        Export the selected HSI to a .itx file.
+        .itx file format: 
+        IGOR
+        WAVES/N=(x, y) <name>
+        BEGIN
+        <data>
+        END
+        X SetScale/P x 0,1,"" dataname
+        X SetScale/P y 0,1,"" dataname
+        X Note dataname, "metadata"
+        metadata as key-value pairs: "key1: value1 ; key2: value2 ; ..."
+        data are simply tab-seperated table, with NaN values replaced by NaN, 
+        '''
+        # get metadata ready:
+        hsiname = self.hsiselect.get() # replace spaces with underscores for the name
+        hsiname_igor = hsiname.replace('-', '_')
+        # this is essential, since Igor pro recognizes na me as wave 2 waves na and me
+        metadata = ' ; '.join([f'{key}: {value} ' for key, value in self.PMdict[hsiname].metadata.items()])
+        data = self.PMdict[hsiname].PixMatrix
+        # write to .itx file
+        filename = tkfd.asksaveasfilename(defaultextension='.itx', filetypes=[('IGOR Pro files', '*.itx')])
+        if filename:
+            with open(filename, 'w') as f:
+                f.write('IGOR\n')
+                f.write(f'WAVES/N=({data.shape[0]}, {data.shape[1]}) {hsiname_igor}\n') # do not change the [0] and [1] - I figured this out!
+                f.write('BEGIN\n')
+                for row in data:
+                    formatted_row = [
+                        'NaN' if (isinstance(val, float) and np.isnan(val)) else str(val)
+                        for val in row
+                    ]
+                    f.write('\t'.join(formatted_row) + '\n')
+                f.write('END\n')
+                f.write(f'X SetScale/P x 0,1,"" {hsiname_igor}\n')
+                f.write(f'X SetScale/P y 0,1,"" {hsiname_igor}\n')
+                f.write(f'X Note {hsiname_igor}, "{metadata}"\n')
     
     def send_to_HSIPlot(self, hsiplotinstance):
         selhsi = self.hsiselect.get()
