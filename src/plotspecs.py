@@ -3,7 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
 from tkinter import ttk
-import src.deflib1 as deflib
+try:
+    from . import deflib1 as deflib
+except ImportError:
+    import deflib1 as deflib
+
 import traceback
 
 
