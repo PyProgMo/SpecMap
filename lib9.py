@@ -1016,10 +1016,15 @@ class XYMap:
         '''
         # get metadata ready:
         hsiname = self.hsiselect.get() # replace spaces with underscores for the name
-        hsiname_igor = hsiname.replace('-', '_')
+        hsiname_igor = hsiname.replace(' ', '_')
         # this is essential, since Igor pro recognizes na me as wave 2 waves na and me
         metadata = ' ; '.join([f'{key}: {value} ' for key, value in self.PMdict[hsiname].metadata.items()])
-        data = self.PMdict[hsiname].PixMatrix
+        #data = np.transpose(self.PMdict[hsiname].PixMatrix)
+        data = self.PMdict[hsiname].PixMatrix # testing, we must "rotate" the data by -90° clockwise, since Igor pro expects the first dimension to be x and the second to be y
+        # data = np.flipud(np.transpose(data)) # rotate +90° clockwise <- this one was the wrong direcation lol
+        data = np.rot90(data, k=-1) # rotate -90° clockwise
+        xscaling = self.PMdict[hsiname].gdx
+        yscaling = self.PMdict[hsiname].gdy
         # write to .itx file
         filename = tkfd.asksaveasfilename(defaultextension='.itx', filetypes=[('IGOR Pro files', '*.itx')])
         if filename:
@@ -1033,9 +1038,19 @@ class XYMap:
                         for val in row
                     ]
                     f.write('\t'.join(formatted_row) + '\n')
-                f.write('END\n')
-                f.write(f'X SetScale/P x 0,1,"" {hsiname_igor}\n')
-                f.write(f'X SetScale/P y 0,1,"" {hsiname_igor}\n')
+                f.write('END\n\n')
+                # write the x ticks into a wave 
+                f.write(f'WAVES/D xticks_{hsiname_igor}\nBEGIN\n')
+                for i in range(data.shape[0]+1):
+                    f.write(f'{i * xscaling}\n')
+                f.write('END\n\n')
+                # write the y ticks into a wave
+                f.write(f'WAVES/D yticks_{hsiname_igor}\nBEGIN\n')
+                for i in range(data.shape[1]+1):
+                    f.write(f'{i * yscaling}\n')
+                f.write('END\n\n')
+                f.write(f'X SetScale/P x 0,{xscaling},"" {hsiname_igor}\n')
+                f.write(f'X SetScale/P y 0,{yscaling},"" {hsiname_igor}\n')
                 f.write(f'X Note {hsiname_igor}, "{metadata}"\n')
     
     def send_to_HSIPlot(self, hsiplotinstance):
@@ -2478,6 +2493,7 @@ class XYMap:
         data = None
         self.selectspecboxVari = self.selectspecbox.get()
         x, y, valid = self.validpixelinput()
+        self.selectwindowboxVari = self.selectwindowbox.get()
         if valid[0] == True and valid[1] == True:
             if self.speckeys[self.selectspecboxVari] == 'WL': #Wavelength
                 data = self.SpecDataMatrix[y][x].WL
