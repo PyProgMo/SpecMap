@@ -147,7 +147,7 @@ class SpectrumData:
                             #self.BG.append(int(parts[1]))
                             print("Warning: loadeachbg is True, but BG data is not being loaded. Check implementation.")
                         #self.WL.append(float(parts[0]))  WL is only read once by XYMap since each SpectrumData has the same WL-axis
-                        self.PL.append(int(parts[2]))
+                        self.PL.append(int(parts[2])) # type: ignore
                     except Exception as e:
                         # Use ErrorEngine for data parsing errors
                         error_engine.error(
@@ -1058,7 +1058,7 @@ class XYMap:
         if selhsi in self.PMdict.keys():
             hsiplotinstance.set_hsi_data(self.PMdict[selhsi].PixMatrix, self.PMdict[selhsi].metadata)
         # tk: switch to HSI Plot tab
-        self.tab_control.select(self.tab_hsiplot)
+        self.tab_control.select(self.tab_hsiplot) # type: ignore
     
     def exportHSIWithSpectra(self):
         """
@@ -1849,15 +1849,15 @@ class XYMap:
         
         if method == 'integrated_counts' or method == 'max_intensity':
             # Use current wavelength range
-            params['wl_start'] = self.wlstart
-            params['wl_end'] = self.wlend
+            params['wl_start'] = self.wlstart # type: ignore
+            params['wl_end'] = self.wlend # type: ignore
         elif method == 'counts_at_wavelength':
             # Get wavelength from entry
             try:
-                params['wavelength'] = float(self.normalize_wl_var.get())
+                params['wavelength'] = float(self.normalize_wl_var.get()) # type: ignore
             except ValueError:
                 print(f"Warning: Invalid normalization wavelength '{self.normalize_wl_var.get()}'. Using mean wavelength.")
-                params['wavelength'] = np.mean(self.WL)
+                params['wavelength'] = np.mean(self.WL) # type: ignore
         
         # Create normalization object and generate matrix
         try:
@@ -3072,9 +3072,9 @@ class XYMap:
                         continue # insufficient points
 
                     if calc_d1:
-                        spec.Specdiff1 = savgol_filter(plb, window, poly_order, deriv=1, delta=delta).astype(np.float32)
+                        spec.Specdiff1 = savgol_filter(plb, window, poly_order, deriv=1, delta=delta).astype(np.float32) # type: ignore
                     if calc_d2:
-                        spec.Specdiff2 = savgol_filter(plb, window, poly_order, deriv=2, delta=delta).astype(np.float32)
+                        spec.Specdiff2 = savgol_filter(plb, window, poly_order, deriv=2, delta=delta).astype(np.float32) # type: ignore
 
                 except Exception as e:
                     error_engine.error(e, context="calculate_derivatives", row=row_idx, col=col_idx)
@@ -3182,10 +3182,10 @@ class XYMap:
                     
                     try:
                         if calc_d1:
-                            setattr(spec, f'Specdiff1{attr_suffix}', savgol_filter(plb_normalized, window, poly_order, deriv=1, delta=delta).astype(np.float32))
+                            setattr(spec, f'Specdiff1{attr_suffix}', savgol_filter(plb_normalized, window, poly_order, deriv=1, delta=delta).astype(np.float32)) # type: ignore
                         
                         if calc_d2:
-                            setattr(spec, f'Specdiff2{attr_suffix}', savgol_filter(plb_normalized, window, poly_order, deriv=2, delta=delta).astype(np.float32))
+                            setattr(spec, f'Specdiff2{attr_suffix}', savgol_filter(plb_normalized, window, poly_order, deriv=2, delta=delta).astype(np.float32)) # type: ignore
                     except Exception as e:
                         print(f"Error calculating savgol_filter array: {e}")
                         pass
@@ -3337,9 +3337,9 @@ class XYMap:
                 suffix = f"{short_code}_{method}".replace(" ", "_").replace("(", "").replace(")", "")
 
             # Use monotonically increasing counter for unique HSI names
-            elif 'fitparameter' in metadata:
-                if metadata['fitparameter'] != '':
-                    suffix = f"{metadata['fitparameter'].replace(" ", "_").replace("(", "").replace(")", "")}_{method}"
+            elif 'fitparameter' in metadata: # type: ignore
+                if metadata['fitparameter'] != '': # type: ignore
+                    suffix = f"{metadata['fitparameter'].replace(" ", "_").replace("(", "").replace(")", "")}_{method}" # type: ignore
             newpmname = f'HSI{self._hsi_counter}_{suffix}'
             self._hsi_counter += 1
         else: 
@@ -3354,8 +3354,8 @@ class XYMap:
         'fitparameter': ''
         }
         if metadata != {}:
-            for i in metadata:
-                self.PMdict[newpmname].metadata[i] = metadata[i]
+            for i in metadata: # type: ignore
+                self.PMdict[newpmname].metadata[i] = metadata[i] # type: ignore
 
         self.PMdict[newpmname].units = {'x': 'um', 'y': 'um', 'wl': 'nm', 'z': ''}
         return newpmname

@@ -131,7 +131,17 @@ class FileProcessorApp:
             # check if self.marwinspecplot is already created, if not create it
             if hasattr(self, 'marwin_specplot'):
                 self.marwin_specplot.clear()
-            self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])
+            # check if self.marwin_specplot is already created, if not create it
+            if not hasattr(self, 'marwin_specplot'):
+                # before crating, check if marwin_specplotlib.HSIExplorer is available
+                try:
+                    if hasattr(marwin_specplotlib, 'HSIExplorer'): # type: ignore
+                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter']) # type: ignore
+                    else:
+                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])# type: ignore
+                except Exception as e:
+                    error_handler.log_error(f"Error initializing Marwins Spekplotter: {e}") # type: ignore
+                    print(f"Failed to initialize Marwins Spekplotter: {e}")
 
     def createbuttons(self, Notebook):
         # Create a canvas with scrollbars for the Load Data tab
@@ -338,7 +348,7 @@ class FileProcessorApp:
             self.marwin_content_frame.bind('<Configure>', lambda e: self.marwin_canvas.configure(scrollregion=self.marwin_canvas.bbox('all')))
             # 
 
-            self.marvs = marwin_specplotlib.HSIExplorer(self.marwin_content_frame)
+            self.marvs = marwin_specplotlib.HSIExplorer(self.marwin_content_frame) # type: ignore
             # buld frame to select dir and open Marwins specplotter
             self.mwframe = tk.Frame(self.load_content_frame, width=60, height=100, borderwidth=5, relief="ridge")
             self.mwframe.grid(row=1, column=1, padx=5, pady=5)
@@ -1450,7 +1460,7 @@ if __name__ == "__main__":
     
     # Store error_engine in app for use throughout application
     app = FileProcessorApp(root, defaults)
-    app.error_engine = error_engine  # Make error engine accessible to app
+    app.error_engine = error_engine  # Make error engine accessible to app # type: ignore
 
     # Set the protocol for closing the window
     root.protocol("WM_DELETE_WINDOW", lambda: pressclose(root, app))
