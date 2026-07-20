@@ -630,6 +630,8 @@ def fitlorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
 
 def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
+    # convert WL from nm to eV for fitting
+    x_ev = arr_nm2ev(x)
     y = PLB[start: end]
     if guess is None:
         initialguess = [np.max(y), x[np.argmax(y)], np.std(x)]
@@ -637,7 +639,7 @@ def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
         initialguess = guess[0:3]
     #print('initialguess:', initialguess)
     #print('generated guess:', [np.max(y), x[np.argmax(y)], np.std(x)])
-    fitdata, pcov = curve_fit(gaussianwind, x, y, p0=initialguess, maxfev=maxfev)
+    fitdata, pcov = curve_fit(gaussianwind, x_ev, y, p0=initialguess, maxfev=maxfev)
     amp_fit, cen_fit, wid_fit = fitdata
     return amp_fit, cen_fit, wid_fit, pcov
     
@@ -3036,7 +3038,21 @@ def testallunits(fitkeys=fitkeys, fitunits=fitunits):
                 unit = 'unknown'
             print(f"{param_name}: {unit}")
 
-
+def arr_nm2ev(arr_nm):
+    """
+    Convert an array of wavelengths in nm to energies in eV.
+    
+    Parameters:
+    -----------
+    arr_nm : array-like
+        Array of wavelengths in nanometers.
+    
+    Returns:
+    --------
+    arr_ev : array-like
+        Array of energies in electron volts.
+    """
+    return 1239.84193 / np.array(arr_nm)  # E(eV) = 1239.84193 / λ(nm)
 
 # fitparametersparis: dict of the fit parameters and their units. Key of getlistofallFitparameters() is the key of the fitkeys dictionary
 # fitunitparis: dict of the fit parameters and their units. Key of getlist
