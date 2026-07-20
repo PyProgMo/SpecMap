@@ -21,3 +21,4 @@ testingscripts/pkls/*.pkl
 .vscode/
 
 # ignore defaults.txt file
+.venv/

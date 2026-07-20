@@ -94,9 +94,10 @@ class SpectrumData:
         # Get default error engine (shared singleton instance)
         # This is safe to use from any thread/context
         error_engine = error_handler.get_default_error_engine()
-        
+        default_decoding = 'utf-8'  # Default encoding for reading files
+
         try:
-            with open(self.filename, 'r') as file:
+            with open(self.filename, 'r', encoding=default_decoding) as file:
                 lines = file.readlines()
         except Exception as e:
             # Use ErrorEngine for file open errors
