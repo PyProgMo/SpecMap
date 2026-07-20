@@ -2613,7 +2613,7 @@ class XYMap:
                 print('Could not save image to {}. {}'.format(savetoimage, str(e)))
 
         else:
-            # click event
+            # click event and update "selected Pixels X and Y"
             cid = fig.canvas.mpl_connect('button_press_event', lambda event: self.on_click(event, self.PMdict[self.getPixMatrixSelection(self.hsiselect.get())].PixMatrix))
             self.updateselectionentries()
             fig.canvas.mpl_connect('motion_notify_event', lambda event: deflib.fig_on_hoverevent(event, ax, fig, self.PMdict[self.getPixMatrixSelection(self.hsiselect.get())].PixMatrix, (self.PixAxX[0], self.PixAxX[-1]), (self.PixAxY[0], self.PixAxY[-1])))
