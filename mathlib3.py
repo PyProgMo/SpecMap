@@ -630,15 +630,25 @@ def fitlorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
 
 def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
+    y = PLB[start: end]
     # convert WL from nm to eV for fitting
     x_ev = arr_nm2ev(x)
-    y = PLB[start: end]
     if guess is None:
-        initialguess = [np.max(y), x[np.argmax(y)], np.std(x)]
+        amp_guess = np.max(y)
+        cen_guess_ev = x_ev[np.argmax(y)]
+        wid_guess_ev = np.std(x_ev)
+        initialguess = [amp_guess, cen_guess_ev, wid_guess_ev]
     else:
-        initialguess = guess[0:3]
-    #print('initialguess:', initialguess)
-    #print('generated guess:', [np.max(y), x[np.argmax(y)], np.std(x)])
+        # assume provided guess is in nm: [amp, center_nm, width_nm]
+        amp = guess[0]
+        cen_nm = guess[1]
+        wid_nm = guess[2]
+        # convert center and width to eV
+        cen_ev = arr_nm2ev(cen_nm)
+        # approximate width conversion using dE/dlambda at center: dE/dλ = 1239.84193 / λ^2
+        wid_ev = (1239.84193 / (cen_nm**2)) * wid_nm
+        initialguess = [amp, cen_ev, wid_ev]
+    # perform fit on energy axis (eV); returned center and width are in eV
     fitdata, pcov = curve_fit(gaussianwind, x_ev, y, p0=initialguess, maxfev=maxfev)
     amp_fit, cen_fit, wid_fit = fitdata
     return amp_fit, cen_fit, wid_fit, pcov
@@ -2799,7 +2809,7 @@ def getderivativepointsfwhm(params):
 #               ]     
 
 fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit', 3, ['Lorentzian amplitude', 'Lorentzian center', 'Lorentzian width'], ['Counts', 'nm', 'nm'], getlorentzfwhm, 0],
-           'gaussian':[gaussianwind, fitgaussiantospec, getmaxgaussian, 'Gaussian fit', 3, ['Gaussian amplitude', 'Gaussian center', 'Gaussian width'], ['Counts', 'nm', 'nm'], getgaussianfwhm, 0],
+           'gaussian':[gaussianwind, fitgaussiantospec, getmaxgaussian, 'Gaussian fit', 3, ['Gaussian amplitude', 'Gaussian center', 'Gaussian width'], ['Counts', 'eV', 'eV'], getgaussianfwhm, 0],
            'voigt':[voigtwind, fitvoigttospec, getmaxvoigt, 'Voigt fit', 4, ['Voigt amplitude', 'Voigt center', 'Voigt width', 'Voigt gamma'], ['Counts', 'nm', 'nm', 'nm'], getvoigtfwhm, 0], 
            'linear':[linearwind, fitlinetospec, getmaxlinear, 'Linear fit', 2, ['Linear slope', 'Linear offset'], ['nm', 'Counts'], None, 0],
            'double lorentz':[double_lorentzwind, fitdoublelorentztospec, getmaxdoublelorentz, 'Double Lorentz fit', 6, ['Double Lorentzian amplitude 1', 'Double Lorentzian center 1', 'Double Lorentzian width 1', 'Double Lorentzian amplitude 2', 'Double Lorentzian center 2', 'Double Lorentzian width 2'], ['Counts', 'nm', 'nm', 'Counts', 'nm', 'nm'], getdoublelorentzfwhm, 0], 
