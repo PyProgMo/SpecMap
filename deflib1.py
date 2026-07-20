@@ -1593,7 +1593,7 @@ def gaussian_weight_matrix(dx=1.0, dy=1.0, sigma_x=None, sigma_y=None, size=3):
     X, Y = np.meshgrid(x, y)
 
     # 2D Gaussian weights
-    w = np.exp(-((X**2)/(2*sigma_x**2) + (Y**2)/(2*sigma_y**2)))
+    w = np.exp(-((X**2)/(2*sigma_x**2) + (Y**2)/(2*sigma_y**2))) # type: ignore
 
     # normalize to sum = 1
     w_norm = w / np.sum(w)
@@ -1675,21 +1675,20 @@ class HSIPlotManager:
 
         # call the existing plot_HSI function; it returns fig, ax
         fig, ax = plot_HSI(data, metadata=metadata,
-                           cmap=call_params.get('cmap'),
+                           cmap=call_params.get('cmap'), #type: ignore
                            vmin=call_params.get('vmin'),
                            vmax=call_params.get('vmax'),
-                           scalebarlength=call_params.get('scalebarlength'),
-                           scalebarwidth=call_params.get('scalebarwidth'),
+                           scalebarlength=call_params.get('scalebarlength'), #type: ignore
+                           scalebarwidth=call_params.get('scalebarwidth'), #type: ignore
                            scalebarpos=call_params.get('scalebarpos'),
                            figsize=call_params.get('figsize'),
-                           title=call_params.get('title'),
+                           title=call_params.get('title'), #type: ignore
                            xlabel=call_params.get('xlabel'),
                            ylabel=call_params.get('ylabel'),
-                           show_colorbar=call_params.get('show_colorbar'),
-                           cbar_unit=call_params.get('cbar_unit'),
-                           scalebarfontsize=call_params.get('scalebarfontsize'),
-                           enable_drag=call_params.get('enable_drag'))
-
+                           show_colorbar=call_params.get('show_colorbar'), #type: ignore
+                           cbar_unit=call_params.get('cbar_unit'), #type: ignore
+                           scalebarfontsize=call_params.get('scalebarfontsize'), #type: ignore
+                           enable_drag=call_params.get('enable_drag')) #type: ignore
         self.plots.append({'fig': fig, 'ax': ax, 'data': data, 'metadata': metadata, 'params': call_params})
         return fig, ax
 

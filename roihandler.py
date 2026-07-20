@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from matplotlib.colors import ListedColormap
 from matplotlib.colors import to_rgba
+import tkinter as tk
 
 try:
     from . import deflib1 as deflib
@@ -10,7 +11,7 @@ except ImportError:
     import deflib1 as deflib
 
 class Roihandler():
-    def __init__(self, roilist={}, pixmatrix=[[]], cmap='viridis'):
+    def __init__(self, roilist={}, pixmatrix=[[]], cmap='viridis', dx=1, dy=1, x0=0, y0=0, update_entries=False, xentry=None, yentry=None):
         self.roi_mode = True
         self.roi_points = []
         self.roi_lines = []
@@ -21,6 +22,18 @@ class Roihandler():
             cmap = 'viridis' 
         self.cmap = cmap
         self.pixmatrix = np.transpose(self.pixmatrix)
+        # selected pixel coordinates
+        self.selX = 0
+        self.selY = 0
+        # x and y axis: 
+        self.dx = dx
+        self.dy = dy
+        self.x0 = x0
+        self.y0 = y0
+        self.update_entries = update_entries
+        self.selectPixX = xentry
+        self.selectPixY = yentry
+        # check if self.selectPixX and self.selectPixY are tk.Entry(xyframe)
         # loading init
         self.construct_roiselgui()
     
@@ -130,6 +143,8 @@ class Roihandler():
         ax.set_title('Region of Interest')
         ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
         ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
+        # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
+
         plt.show()
     
     def delete_roi(self):
@@ -206,6 +221,7 @@ class Roihandler():
             ax.set_title(title, fontsize=fontsize)
             ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
             ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
+            # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
             plt.show()
         else:
             print(f"ROI '{roiname}' not found.")
@@ -235,7 +251,25 @@ class Roihandler():
         ax.set_title(title, fontsize=fontsize)
         ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
         ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
+
+        # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
+
         plt.show()
+
+    def bind_click_event(self, fig, ax):
+        # click event and update "selected Pixels X and Y"
+        cid = fig.canvas.mpl_connect('button_press_event', lambda event: self.on_click(event, self.pixmatrix))
+        self.updateselectionentries()
+        fig.canvas.mpl_connect('motion_notify_event', lambda event: deflib.fig_on_hoverevent(event, ax, fig, self.pixmatrix, (self.PixAxX[0], self.PixAxX[-1]), (self.PixAxY[0], self.PixAxY[-1])))
+
+    def updateselectionentries(self):
+        try:
+            self.selectPixX.delete(0, tk.END) #type: ignore
+            self.selectPixX.insert(0, str(self.selX)) #type: ignore
+            self.selectPixY.delete(0, tk.END) #type: ignore
+            self.selectPixY.insert(0, str(self.selY)) #type: ignore
+        except Exception as e:
+            print(f"Error updating selection entries: {e}. Make sure selectPixX and selectPixY are valid tk.Entry widgets.")
 
 def test_roionpixmatrix():
     pixmatrix = np.random.rand(100, 100)

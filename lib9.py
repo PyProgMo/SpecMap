@@ -2632,7 +2632,6 @@ class XYMap:
             PMname = list(self.PMdict.keys())[0]
         return PMname
 
-
     def plotPixelMatrixSpectral(self):
         PMname = self.getPixMatrixSelection(self.hsiselect.get())
         fig, ax = plt.subplots()
