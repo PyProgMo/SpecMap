@@ -55,18 +55,6 @@ def gaussianwind(x, amp, cen, wid):
 def lorentzwind(x, amp, cen, wid):
     return amp / (1 + (x - cen)**2 / wid**2)
 
-def voigtwindapprox(x, anp, cen, sig, gam):
-    # returns the pseudo-voigt provile as a sum of gaussian and lorentzian profiles
-    return anp * (1 - gam / (2 * sig) * np.sqrt(2 * np.pi) * np.exp(-2 * np.log(2) * ((x - cen) / sig)**2) + (1 - gam) / np.pi / sig / (1 + ((x - cen) / sig)**2))
-
-# def voigtwind(x, amp, cen, wid, gamma): old version
-#    return amp * np.real(wofz(((x - cen) + 1j*gamma) / wid / np.sqrt(2))) / wid / np.sqrt(2*np.pi)
-
-def voigtwind_complex(x, amp, cen, wid, gamma):
-    sigma = wid / np.sqrt(2 * np.log(2))  # Convert FWHM to standard deviation
-    z = ((x - cen) + 1j * gamma) / (sigma * np.sqrt(2))
-    return amp * np.real(wofz(z)) / (sigma * np.sqrt(2 * np.pi))
-
 # pseudo-voigt function for faster fitting
 def voigtwind(x, amp, cen, fwhm, eta):
     sigma = fwhm / 2.354820045
@@ -620,11 +608,24 @@ def fitvoigttospec(start, end, WL, PLB, maxfev=10000, guess=None):
 def fitlorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
     y = PLB[start: end]
+    # convert wavelength (nm) to energy (eV) for fitting
+    x_ev = arr_nm2ev(x)
     if guess is None:
-        initialguess = [np.max(y), x[np.argmax(y)], np.std(x)*2.4]
+        amp_guess = np.max(y)
+        cen_guess_ev = x_ev[np.argmax(y)]
+        wid_guess_ev = np.std(x_ev) * 2.4
+        initialguess = [amp_guess, cen_guess_ev, wid_guess_ev]
     else:
-        initialguess = guess[0:3]
-    fitdata, pcov = curve_fit(lorentzwind, x, y, p0=initialguess, maxfev=maxfev)
+        # assume provided guess is in nm: [amp, center_nm, width_nm]
+        amp = guess[0]
+        cen_nm = guess[1]
+        wid_nm = guess[2]
+        cen_ev = arr_nm2ev(cen_nm)
+        # approximate width conversion: dE/dλ = 1239.84193 / λ^2
+        wid_ev = (1239.84193 / (cen_nm**2)) * wid_nm
+        initialguess = [amp, cen_ev, wid_ev]
+    # perform fit on energy axis (eV); returned center and width are in eV
+    fitdata, pcov = curve_fit(lorentzwind, x_ev, y, p0=initialguess, maxfev=maxfev)
     amp_fit, cen_fit, wid_fit = fitdata
     return amp_fit, cen_fit, wid_fit, pcov
 
@@ -2808,7 +2809,7 @@ def getderivativepointsfwhm(params):
 #               fit_state
 #               ]     
 
-fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit', 3, ['Lorentzian amplitude', 'Lorentzian center', 'Lorentzian width'], ['Counts', 'nm', 'nm'], getlorentzfwhm, 0],
+fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit', 3, ['Lorentzian amplitude', 'Lorentzian center', 'Lorentzian width'], ['Counts', 'eV', 'eV'], getlorentzfwhm, 0],
            'gaussian':[gaussianwind, fitgaussiantospec, getmaxgaussian, 'Gaussian fit', 3, ['Gaussian amplitude', 'Gaussian center', 'Gaussian width'], ['Counts', 'eV', 'eV'], getgaussianfwhm, 0],
            'voigt':[voigtwind, fitvoigttospec, getmaxvoigt, 'Voigt fit', 4, ['Voigt amplitude', 'Voigt center', 'Voigt width', 'Voigt gamma'], ['Counts', 'nm', 'nm', 'nm'], getvoigtfwhm, 0], 
            'linear':[linearwind, fitlinetospec, getmaxlinear, 'Linear fit', 2, ['Linear slope', 'Linear offset'], ['nm', 'Counts'], None, 0],
