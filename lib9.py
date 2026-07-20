@@ -1937,7 +1937,7 @@ class XYMap:
         # before create newpm: create meatadata
         metadata = {}
         if self.selectwindowbox.get() in matl.fitkeys:
-            metadata['unit'] = 'nm'
+            metadata['unit'] = 'eV'
             metadata['quantity'] = 'wavelength'
             metadata['fitmodel'] = self.selectwindowbox.get()
             metadata['fitparameter'] = None
@@ -1965,7 +1965,7 @@ class XYMap:
         # update matadata of newpm: 'unit', 'quantity', 'fitmodel', 'fitparams'
         # 1. set unit according to selected fit function mathlib.fitkeys[self.selectwindowbox.get()][6][0]
         if self.selectwindowbox.get() in matl.fitkeys:
-            self.PMdict[newpm].metadata['unit'] = 'nm'
+            self.PMdict[newpm].metadata['unit'] = 'eV'
             self.PMdict[newpm].metadata['quantity'] = 'wavelength'
             self.PMdict[newpm].metadata['fitmodel'] = self.selectwindowbox.get()
             self.PMdict[newpm].metadata['fitparameter'] = None
@@ -2003,13 +2003,13 @@ class XYMap:
                     self.selectspecboxVari = self.selectspecbox.get()
                     if self.speckeys[self.selectspecboxVari] == 'WL': #Wavelength
                         data = self.SpecDataMatrix[y][x].WL
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Wavelength')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength')
                     elif self.speckeys[self.selectspecboxVari] == 'BG': #Background
                         data = self.SpecDataMatrix[y][x].BG
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Background Counts')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts')
                     elif self.speckeys[self.selectspecboxVari] == 'PL': # Counts
                         data = self.SpecDataMatrix[y][x].PL
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Spectrometer Counts')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts')
                     elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                         data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
                     try: # fit function to spectrum  
@@ -2021,12 +2021,12 @@ class XYMap:
                             except:
                                 print('Maxiter must be type int. Using default 1000.')
                                 self.maxiter = 1000
-                            self.SpecDataMatrix[y][x].fitdata = self.fitkeys[self.selectwindowboxVari][1](self.aqpixstart, self.aqpixend, self.SpecDataMatrix[y][x].WL, self.SpecDataMatrix[y][x].PLB, self.maxiter)
+                            self.SpecDataMatrix[y][x].fitdata = self.fitkeys[self.selectwindowboxVari][1](self.aqpixstart, self.aqpixend, self.SpecDataMatrix[y][x].WL_eV, self.SpecDataMatrix[y][x].PLB, self.maxiter)
                             self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](self.aqpixstart, self.aqpixstart, *self.SpecDataMatrix[y][x].fitdata[:-1])
                             self.SpecDataMatrix[y][x].fitmaxX = self.SpecDataMatrix[y][x].fitmaxX*self.DataSpecdL+self.DataSpecMin
                         
                             #plt.scatter(self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY, color='red')
-                        self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL[self.aqpixstart: self.aqpixend], data, ['Spectrometer counts', self.fitkeys[self.selectwindowboxVari][3]], [self.SpecDataMatrix[y][x].fitdata[:-1]], [self.fitkeys[self.selectwindowboxVari][0]])
+                        self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], data, ['Spectrometer counts', self.fitkeys[self.selectwindowboxVari][3]], [self.SpecDataMatrix[y][x].fitdata[:-1]], [self.fitkeys[self.selectwindowboxVari][0]])
                         
                     except Exception as e:
                         print('Fit failed. {}'.format(str(e)))
@@ -2494,19 +2494,21 @@ class XYMap:
         self.selectspecboxVari = self.selectspecbox.get()
         x, y, valid = self.validpixelinput()
         self.selectwindowboxVari = self.selectwindowbox.get()
+        # wl is required in eV:
+        self.WLunit = 'eV'
         if valid[0] == True and valid[1] == True:
             if self.speckeys[self.selectspecboxVari] == 'WL': #Wavelength
-                data = self.SpecDataMatrix[y][x].WL
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Wavelength')
+                data = self.SpecDataMatrix[y][x].WL_eV
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength')
             elif self.speckeys[self.selectspecboxVari] == 'BG': #Background
                 data = self.SpecDataMatrix[y][x].BG
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Background Counts')
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts')
             elif self.speckeys[self.selectspecboxVari] == 'PL': # Counts
                 data = self.SpecDataMatrix[y][x].PL
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL, 'Spectrometer Counts')
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts')
             elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                 data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
-            self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL[self.aqpixstart: self.aqpixend], 
+            self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], 
                                  data, 
                                  ['', self.fitkeys[self.selectwindowboxVari][3]], 
                                  [self.SpecDataMatrix[y][x].fitdata[:-1]], 
@@ -2520,6 +2522,8 @@ class XYMap:
         #plt.plot(x, fitfunc(*fitdata), label='Fitted function', color='red')
         #plt.plot(x, fitfunc(x, *fitdata), label='Fitted function', color='red')
         self.selectwindowboxVari = self.selectwindowbox.get()
+        print('Plotting fit for window function:', self.selectwindowboxVari)
+        print('Fit data:', fitdata)
         if self.sepfitfunct.get() == True:
             # plot double window function seperately
             if self.selectwindowboxVari == 'double gaussian':
@@ -2527,9 +2531,11 @@ class XYMap:
                 plt.plot(x, matl.gaussianwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Gaussian 1', color='red')
                 plt.plot(x, matl.gaussianwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Gaussian 2', color='green')
             elif self.selectwindowboxVari == 'double lorentz':
+                print('Plotting double gaussian fit, fitdata:', fitdata)
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Lorentz 1', color='red')
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Lorentz 2', color='green')
             elif self.selectwindowboxVari == 'double voigt':
+                print('Plotting double voigt fit, fitdata:', fitdata)
                 # hight version: voigt_height(x, amp, cen, fwhm, eta)
                 # width version: voigtwind(x, amp, cen, fwhm, eta)
                 plt.plot(x, matl.voigt_height(x, fitdata[0][0], fitdata[0][1], fitdata[0][2], fitdata[0][3]), label='Voigt 1', color='red')
