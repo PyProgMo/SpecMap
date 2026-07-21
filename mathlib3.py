@@ -731,7 +731,7 @@ def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
     y = PLB[start: end]
     # convert WL from nm to eV for fitting
-    x_ev = arr_nm2ev(x)
+    x_ev = x #arr_nm2ev(x)
     if guess is None:
         amp_guess = np.max(y)
         cen_guess_ev = x_ev[np.argmax(y)]
@@ -750,6 +750,8 @@ def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     # perform fit on energy axis (eV); returned center and width are in eV
     fitdata, pcov = curve_fit(gaussianwind, x_ev, y, p0=initialguess, maxfev=maxfev)
     amp_fit, cen_fit, wid_fit = fitdata
+    # debug: print fit output parameters
+    print(f"Fit results: amp={amp_fit}, cen={cen_fit}, wid={wid_fit}")
     return amp_fit, cen_fit, wid_fit, pcov
     
 def fitlinetospec(start, end, WL, PLB, maxfev=10000, guess=None):

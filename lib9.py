@@ -94,10 +94,10 @@ class SpectrumData:
         # Get default error engine (shared singleton instance)
         # This is safe to use from any thread/context
         error_engine = error_handler.get_default_error_engine()
-        default_decoding = 'utf-8'  # Default encoding for reading files
+        #default_decoding = 'utf-8'  # Default encoding for reading files
 
         try:
-            with open(self.filename, 'r', encoding=default_decoding) as file:
+            with open(self.filename, 'r') as file:
                 lines = file.readlines()
         except Exception as e:
             # Use ErrorEngine for file open errors
@@ -306,6 +306,8 @@ class XYMap:
             self.DataPixSt = 0
             self.wlstart = self.defentries['lowest_wavelength']
             self.wlend = self.defentries['highest_wavelength']
+            self.wlstart_eV = matl.arr_nm2ev(np.array([self.wlstart]))[0]  # Convert to eV
+            self.wlend_eV = matl.arr_nm2ev(np.array([self.wlend]))[0]  # Convert to eV
             self.SpecDataMatrix = []
             self.gdx = 0
             self.gdy = 0
@@ -313,6 +315,8 @@ class XYMap:
             self.DataPixDY = 0
             self.aqpixstart = 0
             self.aqpixend = -1
+            self.aqpixstart_eV = 0
+            self.aqpixstart_eV = -1
             self.mxcoords = []
             self.mycoords = []
             self.PixAxX = []
@@ -476,7 +480,15 @@ class XYMap:
         if passt == True:
             # convert lambdamin and lambdamax into pixels
             self.aqpixstart = int((self.wlstart-self.DataSpecMin)/self.DataSpecdL)
-            self.aqpixend = int((self.wlend-self.DataSpecMin)/self.DataSpecdL) #round
+            self.aqpixend = int((self.wlend-self.DataSpecMin)/self.DataSpecdL)
+            # update wl boundaries in eV
+            self.wlstart_eV = matl.arr_nm2ev(np.array([self.wlstart]))[0]
+            self.wlend_eV = matl.arr_nm2ev(np.array([self.wlend]))[0]
+            # convert evmin and evmax into pixels
+            self.aqpixstart_eV = int((self.wlstart_eV-matl.arr_nm2ev(np.array([self.DataSpecMax]))[0])/matl.arr_nm2ev(np.array([self.DataSpecdL]))[0])
+            self.aqpixend_eV = int((self.wlend_eV-matl.arr_nm2ev(np.array([self.DataSpecMax]))[0])/matl.arr_nm2ev(np.array([self.DataSpecdL]))[0])
+            # for testing: print updated boundaries
+            print(self.aqpixstart, self.aqpixend, self.aqpixstart_eV, self.aqpixend_eV, self.wlstart, self.wlend, self.wlstart_eV, self.wlend_eV)
     
     def updateproc_spec_max(self):
         try:
@@ -2048,7 +2060,7 @@ class XYMap:
             fitdata = fit_func(
                 aqpixstart,
                 aqpixend,
-                spec_obj.WL,
+                spec_obj.WL_eV,
                 spec_obj.PLB,
                 maxiter,
                 fitbackup
