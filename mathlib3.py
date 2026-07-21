@@ -274,11 +274,14 @@ def estimate_double_gaussian_params(x, y):
     - A1_init, mu1_init, sigma1_init: Estimated parameters for the first Gaussian.
     - A2_init, mu2_init, sigma2_init: Estimated parameters for the second Gaussian.
     """
-    # Find two prominent peaks in the data
-    peaks, _ = find_peaks(y, height=0.1, distance=len(x) // 5)  # Adjust parameters as necessary
+    # Find two prominent peaks in the data.
+    # The components can be close together in eV, so keep the minimum separation modest.
+    peak_height = max(float(np.max(y)) * 0.05, float(np.mean(y)) + 0.1 * float(np.std(y)))
+    peaks, _ = find_peaks(y, height=peak_height, distance=max(1, len(x) // 20))
 
     if len(peaks) < 2:
-        raise ValueError("Less than two peaks found in the data. Ensure the data has two distinct peaks.")
+        # Fallback: use the two strongest points if the peak finder cannot separate them.
+        peaks = np.argsort(y)[-2:]
 
     # Sort the peaks by height (prominence), highest peaks first
     sorted_peaks = peaks[np.argsort(y[peaks])][::-1]
@@ -298,10 +301,17 @@ def estimate_double_gaussian_params(x, y):
 
         # Estimate FWHM by finding where the peak crosses half its maximum
         half_max = A / 2
-        left_idx = np.where(y[:peak_idx] < half_max)[0][-1]  # Left crossing
-        right_idx = np.where(y[peak_idx:] < half_max)[0][0] + peak_idx  # Right crossing
+        left_candidates = np.where(y[:peak_idx] < half_max)[0]
+        right_candidates = np.where(y[peak_idx:] < half_max)[0]
 
-        fwhm = x[right_idx] - x[left_idx]
+        if len(left_candidates) > 0 and len(right_candidates) > 0:
+            left_idx = int(left_candidates[-1])
+            right_idx = int(right_candidates[0] + peak_idx)
+            fwhm = float(x[right_idx] - x[left_idx])
+        else:
+            fwhm = float((x[-1] - x[0]) / 8)
+
+        fwhm = max(fwhm, float((x[-1] - x[0]) / 200))
         
         # Estimate sigma from FWHM (Gaussian relationship: FWHM ≈ 2.355 * sigma)
         sigma = fwhm / 2.355
@@ -374,16 +384,46 @@ def estimate_double_lorentz_params(x, y):
 
 # fit window functions to data  
 def fitdoublegaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
-    x = WL[start: end]
-    y = PLB[start: end]
-    x_ev, _ = _nm_to_ev_axis_with_width_scale(x, y=y)
+    x_ev = np.asarray(WL[start:end])
+    y = np.asarray(PLB[start:end])
+
     if guess is None:
-        initialguess_nm = estimate_double_gaussian_params(x, y)
-        initialguess = _convert_double_peak_guess_nm_to_ev(initialguess_nm, x, y=y, has_gamma=False)
+        initialguess = estimate_double_gaussian_params(x_ev, y)
     else:
-        initialguess = _convert_double_peak_guess_nm_to_ev(guess[0:6], x, y=y, has_gamma=False)
-    #[np.max(y), x[np.argmax(y)], np.std(x), np.max(y), x[np.argmax(y)], np.std(x)] #old fit estimate
-    fitdata, pcov = curve_fit(double_gaussianwind, x_ev, y, p0=initialguess, maxfev=maxfev)
+        initialguess = list(guess[0:6])
+
+    xmin = float(np.min(x_ev))
+    xmax = float(np.max(x_ev))
+    span = max(float(xmax - xmin), 1e-12)
+    min_width = max(span / 200, 1e-6)
+    max_width = span / 2
+
+    lower_bounds = [
+        0.0,  # amp1
+        xmin, # cen1
+        min_width,  # wid1
+        0.0,  # amp2
+        xmin, # cen2
+        min_width,  # wid2
+    ]
+    upper_bounds = [
+        np.amax(y)*1.1,
+        xmax,
+        max_width,
+        np.amax(y)*1.1,
+        xmax,
+        max_width,
+    ]
+
+    initialguess = _clip_initial_guess_to_bounds(initialguess, lower_bounds, upper_bounds)
+    fitdata, pcov = curve_fit(
+        double_gaussianwind,
+        x_ev,
+        y,
+        p0=initialguess,
+        bounds=(lower_bounds, upper_bounds),
+        maxfev=maxfev,
+    )
     amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit = fitdata
     return amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit, pcov
 
@@ -707,7 +747,7 @@ def fitlorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
     x = WL[start: end]
     y = PLB[start: end]
     # convert wavelength (nm) to energy (eV) for fitting
-    x_ev = arr_nm2ev(x)
+    x_ev = x#arr_nm2ev(x)
     if guess is None:
         amp_guess = np.max(y)
         cen_guess_ev = x_ev[np.argmax(y)]
@@ -750,8 +790,6 @@ def fitgaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     # perform fit on energy axis (eV); returned center and width are in eV
     fitdata, pcov = curve_fit(gaussianwind, x_ev, y, p0=initialguess, maxfev=maxfev)
     amp_fit, cen_fit, wid_fit = fitdata
-    # debug: print fit output parameters
-    print(f"Fit results: amp={amp_fit}, cen={cen_fit}, wid={wid_fit}")
     return amp_fit, cen_fit, wid_fit, pcov
     
 def fitlinetospec(start, end, WL, PLB, maxfev=10000, guess=None):

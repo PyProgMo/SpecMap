@@ -487,9 +487,7 @@ class XYMap:
             # convert evmin and evmax into pixels
             self.aqpixstart_eV = int((self.wlstart_eV-matl.arr_nm2ev(np.array([self.DataSpecMax]))[0])/matl.arr_nm2ev(np.array([self.DataSpecdL]))[0])
             self.aqpixend_eV = int((self.wlend_eV-matl.arr_nm2ev(np.array([self.DataSpecMax]))[0])/matl.arr_nm2ev(np.array([self.DataSpecdL]))[0])
-            # for testing: print updated boundaries
-            print(self.aqpixstart, self.aqpixend, self.aqpixstart_eV, self.aqpixend_eV, self.wlstart, self.wlend, self.wlstart_eV, self.wlend_eV)
-    
+            # for testing: print updated boundaries    
     def updateproc_spec_max(self):
         try:
             self.proc_spec_min.delete(0, tk.END)
@@ -2016,13 +2014,13 @@ class XYMap:
                     self.selectspecboxVari = self.selectspecbox.get()
                     if self.speckeys[self.selectspecboxVari] == 'WL': #Wavelength
                         data = self.SpecDataMatrix[y][x].WL
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength', xunit='eV')
                     elif self.speckeys[self.selectspecboxVari] == 'BG': #Background
                         data = self.SpecDataMatrix[y][x].BG
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts', xunit='eV')
                     elif self.speckeys[self.selectspecboxVari] == 'PL': # Counts
                         data = self.SpecDataMatrix[y][x].PL
-                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts')
+                        self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts', xunit='eV')
                     elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                         data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
                     try: # fit function to spectrum  
@@ -2036,7 +2034,6 @@ class XYMap:
                                 self.maxiter = 1000
                             self.SpecDataMatrix[y][x].fitdata = self.fitkeys[self.selectwindowboxVari][1](self.aqpixstart, self.aqpixend, self.SpecDataMatrix[y][x].WL_eV, self.SpecDataMatrix[y][x].PLB, self.maxiter)
                             self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](self.aqpixstart, self.aqpixstart, *self.SpecDataMatrix[y][x].fitdata[:-1])
-                            self.SpecDataMatrix[y][x].fitmaxX = self.SpecDataMatrix[y][x].fitmaxX*self.DataSpecdL+self.DataSpecMin
                         
                             #plt.scatter(self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY, color='red')
                         self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], data, ['Spectrometer counts', self.fitkeys[self.selectwindowboxVari][3]], [self.SpecDataMatrix[y][x].fitdata[:-1]], [self.fitkeys[self.selectwindowboxVari][0]])
@@ -2136,6 +2133,8 @@ class XYMap:
             # Start with the base values to prevent race conditions on self
             local_aqstart = base_aqstart
             local_aqend = base_aqend
+            local_aqstart_ev = self.SpecDataMatrix[i][j].WL_eV[local_aqstart]
+            local_aqend_ev = self.SpecDataMatrix[i][j].WL_eV[local_aqend]
             local_fitbackup = None  # Using None avoids thread contention and bad p0 jumping
             
             while tries < nmin+nmax and not worked and self.SpecDataMatrix[i][j].dofit:
@@ -2169,12 +2168,12 @@ class XYMap:
                 
                 # Only process if fit succeeded
                 if fit_status == 1 and self.SpecDataMatrix[i][j].fitdata != [None]:
-                    fitmaxX, fitmaxY = fit_calc_max(int(local_aqstart), int(local_aqend), *self.SpecDataMatrix[i][j].fitdata[:-1])
+                    fitmaxX, fitmaxY = fit_calc_max(int(local_aqstart_ev), int(local_aqend_ev), *self.SpecDataMatrix[i][j].fitdata[:-1])
                     self.SpecDataMatrix[i][j].fitmaxX = fitmaxX
                     self.SpecDataMatrix[i][j].fitmaxY = fitmaxY
                     r_squared, ss_res, ss_tot = matl.calc_r_squared(
                         self.SpecDataMatrix[i][j].PLB[int(local_aqstart):int(local_aqend)], 
-                        fit_eval(self.SpecDataMatrix[i][j].WL[int(local_aqstart):int(local_aqend)], *self.SpecDataMatrix[i][j].fitdata[:-1])
+                        fit_eval(self.SpecDataMatrix[i][j].WL_eV[int(local_aqstart):int(local_aqend)], *self.SpecDataMatrix[i][j].fitdata[:-1])
                     )
                     
                     try:
@@ -2201,7 +2200,10 @@ class XYMap:
                 if self.SpecDataMatrix[i][j].fitdata == [None] or self.SpecDataMatrix[i][j].fitdata is None:
                     PixMatrix[i][j] = np.nan
                 else:
-                    if self.wlstart <= getattr(self.SpecDataMatrix[i][j], 'fitmaxX', -1) <= self.wlend:
+                    wl_min = float(np.min(self.SpecDataMatrix[i][j].WL_eV[int(local_aqstart):int(local_aqend)]))
+                    wl_max = float(np.max(self.SpecDataMatrix[i][j].WL_eV[int(local_aqstart):int(local_aqend)]))
+
+                    if wl_min <= getattr(self.SpecDataMatrix[i][j], 'fitmaxX', -1) <= wl_max:
                         worked = True
                         PixMatrix[i][j] = self.SpecDataMatrix[i][j].get_attribute(variable)
                 
@@ -2512,13 +2514,13 @@ class XYMap:
         if valid[0] == True and valid[1] == True:
             if self.speckeys[self.selectspecboxVari] == 'WL': #Wavelength
                 data = self.SpecDataMatrix[y][x].WL_eV
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength')
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Wavelength', xunit='eV')
             elif self.speckeys[self.selectspecboxVari] == 'BG': #Background
                 data = self.SpecDataMatrix[y][x].BG
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts')
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Background Counts', xunit='eV')
             elif self.speckeys[self.selectspecboxVari] == 'PL': # Counts
                 data = self.SpecDataMatrix[y][x].PL
-                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts')
+                self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts', xunit='eV')
             elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                 data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
             self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], 
@@ -2565,7 +2567,7 @@ class XYMap:
                     plt.plot(x, fitfunc[i](x, *fitdata[i]), label=label[i+1], color='red')  
             except:
                 plt.show()
-        plt.xlabel('Wavelength / nm', fontsize=self.fontsize)
+        plt.xlabel('Energy / eV', fontsize=self.fontsize)
         plt.ylabel('Intensity / counts', fontsize=self.fontsize)
         plt.title('Spectrograph Data', fontsize=self.fontsize)
         plt.legend(fontsize=self.fontsize)
