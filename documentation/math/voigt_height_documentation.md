@@ -248,13 +248,13 @@ regime, where inhomogeneous broadening dominates.
 
 ### References
 
-1. Moody, G. et al. "Intrinsic homogeneous linewidth and broadening mechanisms of excitons in monolayer transition metal dichalcogenides." *Nat. Commun.* 6, 8315 (2015).
-2. Cadiz, F. et al. "Excitonic Linewidth Approaching the Homogeneous Limit in MoS₂-Based van der Waals Heterostructures." *Phys. Rev. X* 7, 021026 (2017).
-3. Shree, S. et al. "Observation of exciton-phonon coupling in MoSe₂ monolayers." *Phys. Rev. B* 98, 035302 (2018).
-4. Selig, M. et al. "Excitonic linewidth and coherence lifetime in monolayer transition metal dichalcogenides." *Nat. Commun.* 7, 13279 (2016).
-5. Palummo, M., Bernardi, M. & Grossman, J. C. "Exciton Radiative Lifetimes in Two-Dimensional Transition Metal Dichalcogenides." *Nano Lett.* 15, 2794–2800 (2015).
-6. Mak, K. F. et al. "Tightly bound trions in monolayer MoS₂." *Nat. Mater.* 12, 207–211 (2013).
-7. Tongay, S. et al. "Thermally driven crossover from indirect toward direct bandgap in 2D semiconductors: MoSe₂ versus MoS₂." *Nano Lett.* 12, 5576–5580 (2012).
-8. Christiansen, D. et al. "Phonon sidebands in monolayer transition metal dichalcogenides." *Phys. Rev. Lett.* 119, 187402 (2017).
+1. Moody, G. et al. "Intrinsic homogeneous linewidth and broadening mechanisms of excitons in monolayer transition metal dichalcogenides." *Nat. Commun.* 6, 8315 (2015), DOI: [10.1038/ncomms9315](https://www.nature.com/articles/ncomms9315).
+2. Cadiz, F. et al. "Excitonic Linewidth Approaching the Homogeneous Limit in MoS₂-Based van der Waals Heterostructures." *Phys. Rev. X* 7, 021026 (2017), DOI: [10.1103/PhysRevX.7.021026](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.7.021026).
+3. Shree, S. et al. "Observation of exciton-phonon coupling in MoSe₂ monolayers." *Phys. Rev. B* 98, 035302 (2018), DOI: [10.1103/PhysRevB.98.035302](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.98.035302).
+4. Selig, M. et al. "Excitonic linewidth and coherence lifetime in monolayer transition metal dichalcogenides." *Nat. Commun.* 7, 13279 (2016), DOI: [10.1038/ncomms13279](https://www.nature.com/articles/ncomms13279).
+5. Palummo, M., Bernardi, M. & Grossman, J. C. "Exciton Radiative Lifetimes in Two-Dimensional Transition Metal Dichalcogenides." *Nano Lett.* 15, 2794–2800 (2015), DOI: [10.1021/nl503799t](https://pubs.acs.org/doi/10.1021/nl503799t).
+6. Mak, K. F. et al. "Tightly bound trions in monolayer MoS₂." *Nat. Mater.* 12, 207–211 (2013), DOI: [10.1038/nmat3505](https://www.nature.com/articles/nmat3505).
+7. Tongay, S. et al. "Thermally driven crossover from indirect toward direct bandgap in 2D semiconductors: MoSe₂ versus MoS₂." *Nano Lett.* 12, 5576–5580 (2012), DOI: [10.1021/nl3026357](https://pubs.acs.org/doi/10.1021/nl3026357).
+8. Christiansen, D. et al. "Phonon sidebands in monolayer transition metal dichalcogenides." *Phys. Rev. Lett.* 119, 187402 (2017), DOI: [10.1103/PhysRevLett.119.187402](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.119.187402).
 
 ---
