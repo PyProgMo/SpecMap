@@ -2518,6 +2518,13 @@ class XYMap:
         self.selectspecboxVari = self.selectspecbox.get()
         x, y, valid = self.validpixelinput()
         self.selectwindowboxVari = self.selectwindowbox.get()
+        a_index = list(matl.fitkeys.keys()).index(self.selectwindowboxVari)
+        # get the fitdate of the selected selectspecboxVari and the selected pixel (x, y) 
+        """
+        a_index = list(matl.fitkeys.keys()).index(self.selectwindowboxVari)
+        self.SpecDataMatrix[i][j].fitparams[a_index][k] = self.SpecDataMatrix[i][j].fitdata[k]
+        """
+        #fitdata = self.SpecDataMatrix[y][x].fitparams[self.selectwindowboxVari]
         # wl is required in eV:
         self.WLunit = 'eV'
         if valid[0] == True and valid[1] == True:
@@ -2532,16 +2539,23 @@ class XYMap:
                 self.PlotSpectrum(data, self.SpecDataMatrix[y][x].WL_eV, 'Spectrometer Counts', xunit='eV')
             elif self.speckeys[self.selectspecboxVari] == 'PLB': #Spectrum
                 data = self.SpecDataMatrix[y][x].PLB[self.aqpixstart: self.aqpixend]
+            ''' old version, not working with new fitdata structure
             self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], 
                                  data, 
                                  ['', self.fitkeys[self.selectwindowboxVari][3]], 
                                  [self.SpecDataMatrix[y][x].fitdata[:-1]], 
                                  [self.fitkeys[self.selectwindowboxVari][0]]
                                  )
-        # print fit parameters to console
-        print('Fit parameters for pixel ({}, {}):'.format(x, y))
-        print('Fit data:', self.SpecDataMatrix[y][x].fitdata)
-
+            new version, working with new fitdata structure: use fitparameters of the selected windowfunction
+            ''' 
+            print('Plotting fit spectrum for pixel ({}, {}) with fitdata: {}'.format(x, y, self.SpecDataMatrix[y][x].fitparams[a_index][:-1]))
+            self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], 
+                                 data, 
+                                 ['', self.fitkeys[self.selectwindowboxVari][3]], 
+                                 [self.SpecDataMatrix[y][x].fitparams[a_index][:-1]], 
+                                 [self.fitkeys[self.selectwindowboxVari][0]]
+                                 )
+            
     def PlotFitSpectrum(self, x, y, label, fitdata, fitfunc):
         self.readfontsize()
         plt.figure(figsize=(10, 6))
@@ -2549,41 +2563,47 @@ class XYMap:
         #plt.plot(x, fitfunc(*fitdata), label='Fitted function', color='red')
         #plt.plot(x, fitfunc(x, *fitdata), label='Fitted function', color='red')
         self.selectwindowboxVari = self.selectwindowbox.get()
-        print('Plotting fit for window function:', self.selectwindowboxVari)
         # update self.fontsize: 
-        self.readfontsize()
         if self.sepfitfunct.get() == True:
             # plot double window function seperately
             if self.selectwindowboxVari == 'double gaussian':
-                print('Plotting double gaussian fit, fitdata:', fitdata)
                 plt.plot(x, matl.gaussianwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Gaussian 1', color='red')
                 plt.plot(x, matl.gaussianwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Gaussian 2', color='green')
             elif self.selectwindowboxVari == 'double lorentz':
-                print('Plotting double gaussian fit, fitdata:', fitdata)
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][0], fitdata[0][1], fitdata[0][2]), label='Lorentz 1', color='red')
                 plt.plot(x, matl.lorentzwind(x, fitdata[0][3], fitdata[0][4], fitdata[0][5]), label='Lorentz 2', color='green')
             elif self.selectwindowboxVari == 'double voigt':
-                print('Plotting double voigt fit, fitdata:', fitdata)
                 # hight version: voigt_height(x, amp, cen, fwhm, eta)
                 # width version: voigtwind(x, amp, cen, fwhm, eta)
                 plt.plot(x, matl.voigt_height(x, fitdata[0][0], fitdata[0][1], fitdata[0][2], fitdata[0][3]), label='Voigt 1', color='red')
                 plt.plot(x, matl.voigt_height(x, fitdata[0][4], fitdata[0][5], fitdata[0][6], fitdata[0][7]), label='Voigt 2', color='green')
             else:
                 try:
-                    for i in range(len(fitdata)):
-                        plt.plot(x, fitfunc[i](x, *fitdata[i]), label=label[i+1], color='red')  
+                    if len(fitdata) == 1:
+                        plt.plot(x, fitfunc[0](x, *fitdata[0][:self.fitkeys[self.selectwindowboxVari][4]]), label=label[1], color='red')
+                    elif len(fitdata) > 1:
+                        for i in range(len(fitdata)):
+                            plt.plot(x, fitfunc[i](x, *fitdata[i][:self.fitkeys[self.selectwindowboxVari][4]]), label=label[i+1], color='red')  
+                    else:
+                        print('No fitdata available for plotting: ', fitdata)
                 except:
-                    plt.show()
+                    print('Error in plotting fitdata (Seperated Fitkeys): ', fitdata)
+            plt.legend(fontsize=self.fontsize)
         else:  
             try:
-                for i in range(len(fitdata)):
-                    plt.plot(x, fitfunc[i](x, *fitdata[i]), label=label[i+1], color='red')  
+                if len(fitdata) == 1:
+                    plt.plot(x, fitfunc[0](x, *fitdata[0][:self.fitkeys[self.selectwindowboxVari][4]]), label=label[1], color='red')
+                elif len(fitdata) > 1:
+                    for i in range(len(fitdata)):
+                        plt.plot(x, fitfunc[i](x, *fitdata[i][:self.fitkeys[self.selectwindowboxVari][4]]), label=label[i+1], color='red')
+                else:
+                    print('No fitdata available for plotting: ', fitdata)
             except:
-                plt.show()
+                print('Error in plotting fitdata: ', fitdata)
+            plt.legend(fontsize=self.fontsize)
         plt.xlabel('Energy / eV', fontsize=self.fontsize)
         plt.ylabel('Intensity / counts', fontsize=self.fontsize)
         plt.title('Spectrograph Data', fontsize=self.fontsize)
-        plt.legend(fontsize=self.fontsize)
         plt.tick_params(axis='both', which='major', labelsize=self.fontsize)
         plt.grid(True)
         plt.tight_layout()
