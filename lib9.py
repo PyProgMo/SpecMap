@@ -553,7 +553,16 @@ class XYMap:
 
     def build_roi_frame(self, parframe, PMname='HSI0'):
         if not hasattr(self, 'roihandler'):
-            self.roihandler = roihandler.Roihandler(cmap=self.colormap.get())#self)
+            # dx=1, dy=1, x0=0, y0=0, update_entries=False, xentry=None, yentry=None
+            self.roihandler = roihandler.Roihandler(cmap=self.colormap.get(),
+                                                    dx=1,
+                                                    dy=1,
+                                                    x0=0,
+                                                    y0=0,
+                                                    update_entries=True, 
+                                                    xentry=self.selectPixX, 
+                                                    yentry=self.selectPixY
+                                                    )
         self.roisel = tk.StringVar()
 
         frame = tk.Frame(parframe, border=5, relief="raised")
@@ -2548,7 +2557,6 @@ class XYMap:
                                  )
             new version, working with new fitdata structure: use fitparameters of the selected windowfunction
             ''' 
-            print('Plotting fit spectrum for pixel ({}, {}) with fitdata: {}'.format(x, y, self.SpecDataMatrix[y][x].fitparams[a_index][:-1]))
             self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], 
                                  data, 
                                  ['', self.fitkeys[self.selectwindowboxVari][3]], 
@@ -2671,7 +2679,6 @@ class XYMap:
             cid = fig.canvas.mpl_connect('button_press_event', lambda event: self.on_click(event, self.PMdict[self.getPixMatrixSelection(self.hsiselect.get())].PixMatrix))
             self.updateselectionentries()
             fig.canvas.mpl_connect('motion_notify_event', lambda event: deflib.fig_on_hoverevent(event, ax, fig, self.PMdict[self.getPixMatrixSelection(self.hsiselect.get())].PixMatrix, (self.PixAxX[0], self.PixAxX[-1]), (self.PixAxY[0], self.PixAxY[-1])))
-
             plt.show()
 
     def getPixMatrixSelection(self, PMname=None):

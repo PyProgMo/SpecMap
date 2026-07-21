@@ -31,8 +31,8 @@ class Roihandler():
         self.x0 = x0
         self.y0 = y0
         self.update_entries = update_entries
-        self.selectPixX = xentry
-        self.selectPixY = yentry
+        self.selectPixX = xentry # tk.Entry widget for selected pixel X coordinate
+        self.selectPixY = yentry # tk.Entry widget for selected pixel Y coordinate
         # check if self.selectPixX and self.selectPixY are tk.Entry(xyframe)
         # loading init
         self.construct_roiselgui()
@@ -113,8 +113,19 @@ class Roihandler():
         plt.draw()
             
     def on_click(self, event):
+        if event.inaxes is None:
+            return
+
+        x, y = event.xdata, event.ydata
+        if x is None or y is None:
+            return
+
+        self.selX = int(round(x))
+        self.selY = int(round(y))
+        if self.update_entries:
+            self.updateselectionentries()
+
         if self.roi_mode and event.inaxes == self.ax:
-            x, y = event.xdata, event.ydata
             self.roi_points.append((x, y))
             point_plot, = self.ax.plot(x, y, 'ro')
             self.roi_lines.append(point_plot)
@@ -143,7 +154,8 @@ class Roihandler():
         ax.set_title('Region of Interest')
         ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
         ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
-        # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
+        if self.update_entries:
+            self.bind_click_event(fig, ax)
 
         plt.show()
     
@@ -221,7 +233,8 @@ class Roihandler():
             ax.set_title(title, fontsize=fontsize)
             ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
             ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
-            # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
+            if self.update_entries:
+                self.bind_click_event(fig, ax)
             plt.show()
         else:
             print(f"ROI '{roiname}' not found.")
@@ -251,16 +264,13 @@ class Roihandler():
         ax.set_title(title, fontsize=fontsize)
         ax.set_xlabel('Nanostage X Axis in \u03bcm', fontsize=fontsize)
         ax.set_ylabel('Nanostage Y Axis in \u03bcm', fontsize=fontsize)
-
-        # self.bind_click_event(fig, ax) todo: implement click event for multiple rois if needed
-
+        if self.update_entries:
+            self.bind_click_event(fig, ax) 
         plt.show()
 
     def bind_click_event(self, fig, ax):
         # click event and update "selected Pixels X and Y"
-        cid = fig.canvas.mpl_connect('button_press_event', lambda event: self.on_click(event, self.pixmatrix))
-        self.updateselectionentries()
-        fig.canvas.mpl_connect('motion_notify_event', lambda event: deflib.fig_on_hoverevent(event, ax, fig, self.pixmatrix, (self.PixAxX[0], self.PixAxX[-1]), (self.PixAxY[0], self.PixAxY[-1])))
+        fig.canvas.mpl_connect('button_press_event', self.on_click)
 
     def updateselectionentries(self):
         try:
