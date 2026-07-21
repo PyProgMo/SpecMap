@@ -12,112 +12,11 @@ from scipy.signal import hilbert
 import sys
 
 
-# window functions
-def voigt_pseudo(x, cen, fwhm, eta):
-    sigma = fwhm / 2.354820045
-    gamma = fwhm / 2.0
-    G = np.exp(-0.5 * ((x - cen) / sigma)**2)
-    L = gamma**2 / ((x - cen)**2 + gamma**2)
-    return eta * L + (1 - eta) * G
-
-def doublevoigt5param(x, A, EX, fwhm, r, B, delta=30.0, eta=0.5):
-    """
-    A     : overall amplitude
-    EX    : exciton (center of main peak)
-    fwhm  : shared width
-    r     : relative amplitude (trion/exciton)
-    B     : background
-    delta : fixed splitting (meV), default ~30 meV for MoSe2
-    eta   : mixing parameter (0=Gaussian, 1=Lorentzian)
-    """
-    peak1 = voigt_pseudo(x, EX, fwhm, eta)
-    peak2 = voigt_pseudo(x, EX - delta, fwhm, eta)
-    
-    return A * (peak1 + r * peak2) + B
-
-def doublevoigt5paramwind(x, A, EX, fwhm, r, B):
-    return doublevoigt5param(x, A, EX, fwhm, r, B)
-
 def double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2):
     return voigt_height(x, amp1, cen1, wid1, gamma1) + voigt_height(x, amp2, cen2, wid2, gamma2)
 
 def _mev_to_ev(value_mev):
     return float(value_mev) / 1000.0
-
-def _nm_to_ev_axis_with_width_scale(x_nm, y=None):
-    """
-    Convert an nm axis to eV and return a local nm->eV width scale.
-
-    If y is provided, the scale is evaluated near the dominant feature.
-    """
-    x_nm = np.asarray(x_nm)
-    x_ev = arr_nm2ev(x_nm)
-    if y is not None and len(y) == len(x_nm):
-        center_idx = int(np.argmax(y))
-    else:
-        center_idx = len(x_nm) // 2
-    center_nm = float(x_nm[center_idx])
-    width_scale = 1239.84193 / (center_nm ** 2)
-    return x_ev, width_scale
-
-def _convert_double_peak_guess_nm_to_ev(guess, x_nm, y=None, has_gamma=False):
-    """
-    Convert double-peak guesses from nm to eV.
-
-    Guess order is assumed to be [amp1, cen1, width1, amp2, cen2, width2]
-    or [amp1, cen1, width1, gamma1, amp2, cen2, width2, gamma2] when
-    has_gamma is True.
-    """
-    if guess is None:
-        return None
-
-    x_nm = np.asarray(x_nm)
-    _, width_scale = _nm_to_ev_axis_with_width_scale(x_nm, y=y)
-
-    if has_gamma:
-        amp1, cen1_nm, wid1_nm, gamma1_nm, amp2, cen2_nm, wid2_nm, gamma2_nm = guess[:8]
-        return [
-            amp1,
-            float(arr_nm2ev(cen1_nm)),
-            float(width_scale * wid1_nm),
-            float(width_scale * gamma1_nm),
-            amp2,
-            float(arr_nm2ev(cen2_nm)),
-            float(width_scale * wid2_nm),
-            float(width_scale * gamma2_nm),
-        ]
-
-    amp1, cen1_nm, wid1_nm, amp2, cen2_nm, wid2_nm = guess[:6]
-    return [
-        amp1,
-        float(arr_nm2ev(cen1_nm)),
-        float(width_scale * wid1_nm),
-        amp2,
-        float(arr_nm2ev(cen2_nm)),
-        float(width_scale * wid2_nm),
-    ]
-
-def _normalize_double_peak_guess_to_ev(guess, x_nm, y=None, has_gamma=False):
-    """
-    Normalize a double-peak guess to the energy axis.
-
-    The fit functions in this module operate in eV, so existing fit results
-    should be reused as-is. Legacy guesses expressed in nm can still be
-    accepted and converted when the center values are clearly wavelength-like.
-    """
-    if guess is None:
-        return None
-
-    guess = list(guess[:8] if has_gamma else guess[:6])
-    center_indices = (1, 5)
-    centers = [float(guess[i]) for i in center_indices if i < len(guess)]
-
-    # Fit results in this codebase should normally already be in eV.
-    # If the centers are still wavelength-sized, convert the legacy guess.
-    if centers and max(centers) > 20.0:
-        return _convert_double_peak_guess_nm_to_ev(guess, x_nm, y=y, has_gamma=has_gamma)
-
-    return guess
 
 def _clip_initial_guess_to_bounds(initial_guess, lower_bounds, upper_bounds):
     clipped_guess = []
@@ -359,11 +258,13 @@ def estimate_double_lorentz_params(x, y):
     - A1_init, mu1_init, gamma1_init: Estimated parameters for the first Lorentzian.
     - A2_init, mu2_init, gamma2_init: Estimated parameters for the second Lorentzian.
     """
-    # Find two prominent peaks in the data
-    peaks, _ = find_peaks(y, height=0.1, distance=len(x) // 5)  # Adjust parameters if necessary
+    # Find two prominent peaks in the data. Close energy-domain peaks can merge,
+    # so keep the detector permissive and fall back to the two strongest points.
+    peak_height = max(float(np.max(y)) * 0.05, float(np.mean(y)) + 0.1 * float(np.std(y)))
+    peaks, _ = find_peaks(y, height=peak_height, distance=max(1, len(x) // 20))
 
     if len(peaks) < 2:
-        raise ValueError("Less than two peaks found in the data. Ensure the data has two distinct peaks.")
+        peaks = np.argsort(y)[-2:]
 
     # Sort peaks by height (prominence), highest peaks first
     sorted_peaks = peaks[np.argsort(y[peaks])][::-1]
@@ -386,7 +287,7 @@ def estimate_double_lorentz_params(x, y):
         left_idx = np.where(y[:peak_idx] < half_max)[0][-1]  # Left crossing
         right_idx = np.where(y[peak_idx:] < half_max)[0][0] + peak_idx  # Right crossing
 
-        fwhm = x[right_idx] - x[left_idx]
+        fwhm = abs(float(x[right_idx] - x[left_idx]))
         
         # For Lorentzian, the HWHM is directly related to gamma
         gamma = fwhm / 2
@@ -448,16 +349,45 @@ def fitdoublegaussiantospec(start, end, WL, PLB, maxfev=10000, guess=None):
     return amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit, pcov
 
 def fitdoublelorentztospec(start, end, WL, PLB, maxfev=10000, guess=None):
-    x = WL[start: end]
-    y = PLB[start: end]
-    x_ev, _ = _nm_to_ev_axis_with_width_scale(x, y=y)
+    x_ev = np.asarray(WL[start:end])
+    y = np.asarray(PLB[start:end])
     if guess is None:
-        initialguess_nm = estimate_double_lorentz_params(x, y)
-        initialguess = _convert_double_peak_guess_nm_to_ev(initialguess_nm, x, y=y, has_gamma=False)
+        initialguess = estimate_double_lorentz_params(x_ev, y)
     else:
-        initialguess = _convert_double_peak_guess_nm_to_ev(guess[0:6], x, y=y, has_gamma=False)
-    #[np.max(y), x[np.argmax(y)], np.std(x), np.max(y), x[np.argmax(y)], np.std(x)] old fit estimate
-    fitdata, pcov = curve_fit(double_lorentzwind, x_ev, y, p0=initialguess, maxfev=maxfev)
+        initialguess = list(guess[0:6])
+
+    xmin = float(np.min(x_ev))
+    xmax = float(np.max(x_ev))
+    span = max(float(xmax - xmin), 1e-12)
+    min_width = max(span / 200, 1e-6)
+    max_width = span / 2
+
+    lower_bounds = [
+        0.0,  # amp1
+        xmin, # cen1
+        min_width,  # wid1
+        0.0,  # amp2
+        xmin, # cen2
+        min_width,  # wid2
+    ]
+    upper_bounds = [
+        np.amax(y) * 1.1,
+        xmax,
+        max_width,
+        np.amax(y) * 1.1,
+        xmax,
+        max_width,
+    ]
+
+    initialguess = _clip_initial_guess_to_bounds(initialguess, lower_bounds, upper_bounds)
+    fitdata, pcov = curve_fit(
+        double_lorentzwind,
+        x_ev,
+        y,
+        p0=initialguess,
+        bounds=(lower_bounds, upper_bounds),
+        maxfev=maxfev,
+    )
     amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit = fitdata
     return amp1_fit, cen1_fit, wid1_fit, amp2_fit, cen2_fit, wid2_fit, pcov
 
@@ -686,73 +616,6 @@ def build_double_voigt_bounds_and_guess(x, y, delta_guess=30.0, delta_tol=15.0,
 
     return initial_guess, (lower_bounds, upper_bounds)
 
-'''old stuff, now we add the new physically-informed bounds and guess function above
-def fitdoublevoigttospec(start, end, WL, PLB, maxfev=10000, guess=None):
-    x = WL[start: end]
-    y = PLB[start: end]
-    if guess is None:
-        initialguess = estimate_double_voigt_params(x, y)
-    else:
-        initialguess = guess[0:8]
-    
-    lower_bounds = [0, np.min(x), 0, 0, 0, np.min(x), 0, 0]  # Example lower bounds
-    upper_bounds = [np.inf, np.max(x), np.inf, np.inf, np.inf, np.max(x), np.inf, np.inf]  # Example upper bounds
-
-    #[np.max(y), x[np.argmax(y)], np.std(x), np.std(x), np.max(y), x[np.argmax(y)], np.std(x), np.std(x)] old fit estimate
-    fitdata, pcov = curve_fit(double_voigtwind, x, y, p0=initialguess, maxfev=maxfev,
-                              # tighten fith convergence by setting bounds
-                              ftol = 1e-10, xtol=1e-10, gtol=1e-10,
-                              )
-    amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit = fitdata
-    return amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit, pcov
-'''
-def fitdoublevoigttospec(start, end, WL, PLB, maxfev=10000, guess=None,
-                          delta_guess=30.0, delta_tol=15.0, min_linewidth=1.0):
-    x = WL[start:end]
-    y = PLB[start:end]
-    x_ev, _ = _nm_to_ev_axis_with_width_scale(x, y=y)
-    delta_guess_ev = _mev_to_ev(delta_guess)
-    delta_tol_ev = _mev_to_ev(delta_tol)
-    _, width_scale = _nm_to_ev_axis_with_width_scale(x, y=y)
-    min_linewidth_ev = width_scale * min_linewidth
-
-    initialguess, (lower_bounds, upper_bounds) = build_double_voigt_bounds_and_guess(
-        x_ev, y, delta_guess=delta_guess_ev, delta_tol=delta_tol_ev, min_linewidth=min_linewidth_ev
-    )
-    if guess is not None:
-        initialguess = _normalize_double_peak_guess_to_ev(guess, x, y=y, has_gamma=True)
-    initialguess = _clip_initial_guess_to_bounds(initialguess, lower_bounds, upper_bounds)
-
-    fitdata, pcov = curve_fit(double_voigtwind, x_ev, y, p0=initialguess, maxfev=maxfev,
-                               bounds=(lower_bounds, upper_bounds),
-                               ftol=1e-10, xtol=1e-10, gtol=1e-10)
-    amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit = fitdata
-    return amp1_fit, cen1_fit, wid1_fit, gamma1_fit, amp2_fit, cen2_fit, wid2_fit, gamma2_fit, pcov
-
-def fitdoublevoigttospec_Feddeva(start, end, WL, PLB, maxfev=10000, guess=None,
-                          delta_guess=30.0, delta_tol=15.0, min_linewidth=1.0):
-    x = WL[start:end]
-    y = PLB[start:end]
-    x_ev, _ = _nm_to_ev_axis_with_width_scale(x, y=y)
-    delta_guess_ev = _mev_to_ev(delta_guess)
-    delta_tol_ev = _mev_to_ev(delta_tol)
-    _, width_scale = _nm_to_ev_axis_with_width_scale(x, y=y)
-    min_linewidth_ev = width_scale * min_linewidth
-
-    initialguess, (lower_bounds, upper_bounds) = build_double_voigt_Feddeva_bounds_and_guess(
-        x_ev, y, delta_guess=delta_guess_ev, delta_tol=delta_tol_ev, min_linewidth=min_linewidth_ev
-    )
-    if guess is not None:
-        initialguess = _normalize_double_peak_guess_to_ev(guess, x, y=y, has_gamma=True)
-    initialguess = _clip_initial_guess_to_bounds(initialguess, lower_bounds, upper_bounds)
-    
-    fitdata, pcov = curve_fit(double_voigt_true, x_ev, y, p0=initialguess, maxfev=maxfev, 
-                               bounds=(lower_bounds, upper_bounds),
-                               ftol=1e-10, xtol=1e-10, gtol=1e-10)
-    amp1_fit, cen1_fit, sigma1_fit, gamma1_fit, amp2_fit, cen2_fit, sigma2_fit, gamma2_fit = fitdata
-    return amp1_fit, cen1_fit, sigma1_fit, gamma1_fit, amp2_fit, cen2_fit, sigma2_fit, gamma2_fit, pcov
-
-
 ### end of double voigt stuff
 
 def fitvoigttospec(start, end, WL, PLB, maxfev=10000, guess=None):
@@ -826,17 +689,6 @@ def fitlinetospec(start, end, WL, PLB, maxfev=10000, guess=None):
     a, b = fitdata
     return a, b, pconf
 
-def fitdoublevoigt5paramtospec(start, end, WL, PLB, maxfev=10000, guess=None):
-    x = WL[start: end]
-    y = PLB[start: end]
-    if guess is None:
-        initialguess = doublevoigt_5param_approx(x, y)
-    else:
-        initialguess = guess[0:5]
-    fitdata, pcov = curve_fit(doublevoigt5param, x, y, p0=initialguess, maxfev=maxfev)
-    A_fit, EX_fit, fwhm_fit, r_fit, B_fit = fitdata
-    return A_fit, EX_fit, fwhm_fit, r_fit, B_fit, pcov
-
 # get maxima of fitted functions
 def getmaxdoublegaussian(xmin, xmax, amp1, cen1, wid1, amp2, cen2, wid2):
     x, y = Maxbyinsert(lambda x: -double_gaussianwind(x, amp1, cen1, wid1, amp2, cen2, wid2), [xmin, xmax], 10000)
@@ -847,10 +699,7 @@ def getmaxdoublelorentz(xmin, xmax, amp1, cen1, wid1, amp2, cen2, wid2):
     return x, y #-fun
 
 def getmaxdoublevoigt(xmin, xmax, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2):
-    #x = Newtonmax(lambda x: -double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2), cen1, tol=1e-6, maxiter=10000, xmin=xmin, xmax=xmax)
-    #y = double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2)
     x, y = Maxbyinsert(lambda x: -double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2), [xmin, xmax], 10000)
-    #success, x, fun = find_max_of_fit(lambda x: -double_voigtwind(x, amp1, cen1, wid1, gamma1, amp2, cen2, wid2, gamma2), xmin=xmin, xmax=xmax)
     return x, y
     
 # max of 1D Fit functions can be obtained by reading their parameters
@@ -865,13 +714,6 @@ def getmaxvoigt(xmin, xmax, amp, cen, wid, gamma):
 
 def getmaxlinear(xmin, xmax, a, b):
     pass
-
-def getmaxdoublevoigt5param(xmin, xmax, A, EX, fwhm, r, B):
-    #x = Newtonmax(lambda x: -doublevoigt_5param(x, A, EX, fwhm, r, B), EX, tol=1e-6, maxiter=10000, xmin=xmin, xmax=xmax)
-    #y = doublevoigt_5param(x, A, EX, fwhm, r, B)
-    x, y = Maxbyinsert(lambda x: -doublevoigt5param(x, A, EX, fwhm, r, B), [xmin, xmax], 10000)
-    #success, x, fun = find_max_of_fit(lambda x: -doublevoigt_5param(x, A, EX, fwhm, r, B), xmin=xmin, xmax=xmax)
-    return x, y #-fun
 
 # 2D Pixmatrix Fit functions
 # 2d gaussian function
@@ -1068,29 +910,6 @@ def getdoublevoigtfwhm(fitparams):
 
     # right crossing
     x2 = np.interp(half, [y[i2], y[i2+1]], [xgrid[i2], xgrid[i2+1]])
-
-    return x2 - x1
-
-def getdoublevoigt5paramfwhm(fitparam): #x, A, EX, fwhm, r, B, delta=30, eta=0.5) # let do this without xgrid as parameter, we can use the fitparam to generate the xgrid
-    A, EX, fwhm, r, B = fitparam # older versions also had delta and eta here, but we will ignore them for now
-    # delta and eta 
-    x = np.linspace(EX - 5 * fwhm, EX + 5 * fwhm, 10000)
-
-    y = doublevoigt5param(x, A, EX, fwhm, r, B)#, delta, eta) 
-
-    ymax = np.max(y)
-    half = ymax / 2
-
-    # find crossings
-    indices = np.where(y >= half)[0]
-    if len(indices) < 2:
-        return np.nan
-
-    i1, i2 = indices[0], indices[-1]
-
-    # use x to find the corresponding x values for the half maximum
-    x1 = np.interp(half, [y[i1-1], y[i1]], [x[i1-1], x[i1]])
-    x2 = np.interp(half, [y[i2], y[i2+1]], [x[i2], x[i2+1]])
 
     return x2 - x1
 
@@ -1308,7 +1127,7 @@ def extract_phase_evolution(oscillations, wl, maxima_indices, minima_indices):
     # Method 2: Use Hilbert transform for continuous phase (stored for potential future use)
     try:
         analytic_signal = hilbert(oscillations)
-        instantaneous_phase = np.unwrap(np.angle(analytic_signal))
+        instantaneous_phase = np.unwrap(np.angle(analytic_signal)) #type: ignore
         # Instantaneous frequency from phase derivative
         hilbert_freq = np.gradient(instantaneous_phase) / np.gradient(wl) / (2 * np.pi)
     except:
@@ -1365,7 +1184,7 @@ def fitoscillationtospec(start, end, WL, PLB, maxfev=10000, guess=None):
     )
     
     # Calculate summary statistics for fitkeys compatibility
-    background_mean = np.mean(background)
+    background_mean = np.mean(background) #type: ignore
     osc_amplitude = np.std(oscillations)
     n_maxima = len(maxima_indices)
     n_minima = len(minima_indices)
@@ -1908,32 +1727,32 @@ def fitderivativestospec(start, end, WL, PLB, maxfev=10000, guess=None):
         d2 = savgol_filter(y, window_length, polyorder, deriv=2, delta=dx)
         
         # Find peak position from smoothed data
-        peak_idx = np.argmax(y_smooth)
+        peak_idx = np.argmax(y_smooth) #type: ignore
         E_max = float(x[peak_idx])
-        I_max = float(y_smooth[peak_idx])
+        I_max = float(y_smooth[peak_idx]) #type: ignore
         
         # Max slope on rising edge (before peak)
         if peak_idx > 0:
-            idx_rise = np.argmax(d1[:peak_idx])
-            max_slope_rise = float(d1[idx_rise])
+            idx_rise = np.argmax(d1[:peak_idx]) #type: ignore
+            max_slope_rise = float(d1[idx_rise]) #type: ignore
             E_rise = float(x[idx_rise])
         else:
             max_slope_rise = 0.0
             E_rise = E_max
             
         # Max slope on falling edge (after peak) - should be negative
-        if peak_idx < len(d1) - 1:
+        if peak_idx < len(d1) - 1: #type: ignore
             # search in [peak_idx:]
-            idx_fall_local = np.argmin(d1[peak_idx:])
+            idx_fall_local = np.argmin(d1[peak_idx:]) #type: ignore
             idx_fall = peak_idx + idx_fall_local
-            max_slope_fall = float(d1[idx_fall])
+            max_slope_fall = float(d1[idx_fall]) #type: ignore
             E_fall = float(x[idx_fall])
         else:
             max_slope_fall = 0.0
             E_fall = E_max
             
         # Curvature at peak (2nd derivative at peak index)
-        curvature_top = float(d2[peak_idx])
+        curvature_top = float(d2[peak_idx]) #type: ignore
         
         # Asymmetry metric based on max slopes
         abs_fall = abs(max_slope_fall)
@@ -2854,6 +2673,9 @@ def fitderivativepoints(start, end, WL, PLB, maxfev=10000, guess=None, deriv1=No
     
     if len(x) < 4:
         return *results, None
+    # init default x_d1 and x_d2 to x in case deriv1 or deriv2 are not provided
+    x_d1 = x
+    x_d2 = x
         
     try:
         # --- Handle First Derivative (Zero Crossings) ---
@@ -3091,7 +2913,7 @@ fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit
                ['nm', 'Counts'] * 15,
                getderivativepointsfwhm,
                0
-           ], 
+           ]
 # explained fitkeys structure:
 #            'name':[
 #               window_function, 
@@ -3114,19 +2936,8 @@ fitkeys = {'lorentz':[lorentzwind, fitlorentztospec, getmaxlorentz, 'Lorentz fit
 #               ['Counts', 'nm', 'nm', 'nm', 'Counts', 'nm', 'nm', 'nm'], 
 #               getdoublevoigtfwhm, 
 #               0
-#               ] 
-
-           'doublevoigt5params': [
-               doublevoigt5paramwind, 
-               fitdoublevoigt5paramtospec, 
-               getmaxdoublevoigt5param, 
-                'Double Voigt 5-Parameter Fit', 
-                5, 
-                ['Amplitude 1', 'Center 1', 'Width 1', 'Amplitude 2', 'Center 2'], 
-                ['Counts', 'nm', 'nm', 'Counts', 'nm'], 
-                getdoublevoigt5paramfwhm,
-                0
-           ]
+#               ]
+#           add further fit functions here as needed, following the same structure. 
            }
 
 # units to add fit is not defined in context so I rely on surrounding code to handle units
@@ -3147,7 +2958,6 @@ fitunits = {'lorentz': fitkeys['lorentz'][6][:]+ unitstoaddfit,
             'derivative1': fitkeys['derivative1'][6][:] + unitstoaddfit,
             'derivative2': fitkeys['derivative2'][6][:] + unitstoaddfit,
             'derivative_points': fitkeys['derivative_points'][6][:] + unitstoaddfit,
-            'doublevoigt5params': fitkeys['doublevoigt5params'][6][:] + unitstoaddfit
             }
 
 def fitkeys_to_fitunits(fitkeys=getlistofallFitparameters(), fitunits=fitunits):
