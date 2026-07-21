@@ -2033,7 +2033,10 @@ class XYMap:
                                 print('Maxiter must be type int. Using default 1000.')
                                 self.maxiter = 1000
                             self.SpecDataMatrix[y][x].fitdata = self.fitkeys[self.selectwindowboxVari][1](self.aqpixstart, self.aqpixend, self.SpecDataMatrix[y][x].WL_eV, self.SpecDataMatrix[y][x].PLB, self.maxiter)
-                            self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](self.aqpixstart, self.aqpixstart, *self.SpecDataMatrix[y][x].fitdata[:-1])
+                            x_window = self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart:self.aqpixend]
+                            fit_xmin = float(np.min(x_window))
+                            fit_xmax = float(np.max(x_window))
+                            self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](fit_xmin, fit_xmax, *self.SpecDataMatrix[y][x].fitdata[:-1])
                         
                             #plt.scatter(self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY, color='red')
                         self.PlotFitSpectrum(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart: self.aqpixend], data, ['Spectrometer counts', self.fitkeys[self.selectwindowboxVari][3]], [self.SpecDataMatrix[y][x].fitdata[:-1]], [self.fitkeys[self.selectwindowboxVari][0]])
@@ -2168,7 +2171,10 @@ class XYMap:
                 
                 # Only process if fit succeeded
                 if fit_status == 1 and self.SpecDataMatrix[i][j].fitdata != [None]:
-                    fitmaxX, fitmaxY = fit_calc_max(int(local_aqstart_ev), int(local_aqend_ev), *self.SpecDataMatrix[i][j].fitdata[:-1])
+                    x_window = self.SpecDataMatrix[i][j].WL_eV[int(local_aqstart):int(local_aqend)]
+                    fit_xmin = float(np.min(x_window))
+                    fit_xmax = float(np.max(x_window))
+                    fitmaxX, fitmaxY = fit_calc_max(fit_xmin, fit_xmax, *self.SpecDataMatrix[i][j].fitdata[:-1])
                     self.SpecDataMatrix[i][j].fitmaxX = fitmaxX
                     self.SpecDataMatrix[i][j].fitmaxY = fitmaxY
                     r_squared, ss_res, ss_tot = matl.calc_r_squared(
@@ -2259,7 +2265,10 @@ class XYMap:
                                         print('Maxiter must be int. Using default 1000.')
                                         self.maxiter = 1000
                                     self.SpecDataMatrix[y][x].fitdata = self.fitkeys[self.selectwindowboxVari][1](self.aqpixstart, self.aqpixend, self.SpecDataMatrix[y][x].WL, self.SpecDataMatrix[y][x].PLB, self.maxiter)
-                                    self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](self.aqpixstart, self.aqpixend, *self.SpecDataMatrix[y][x].fitdata[:-1])#[1]
+                                    x_window = self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart:self.aqpixend]
+                                    fit_xmin = float(np.min(x_window))
+                                    fit_xmax = float(np.max(x_window))
+                                    self.SpecDataMatrix[y][x].fitmaxX, self.SpecDataMatrix[y][x].fitmaxY = self.fitkeys[self.selectwindowboxVari][2](fit_xmin, fit_xmax, *self.SpecDataMatrix[y][x].fitdata[:-1])#[1]
                                     r_squared, ss_res, ss_tot = matl.calc_r_squared(self.SpecDataMatrix[y][x].PLB[self.aqpixstart:self.aqpixend], self.fitkeys[self.selectwindowboxVari][0](self.SpecDataMatrix[y][x].WL[self.aqpixstart:self.aqpixend], *self.SpecDataMatrix[y][x].fitdata[:-1]))
                                     a =  list(matl.fitkeys.keys()).index(self.selectwindowbox.get())
                                     # put fitdata into fitparams
@@ -2283,7 +2292,7 @@ class XYMap:
                                     PixMatrix[y][x] = np.nan 
                                 else:
                                     # check if maximum is within the window and set to Intmatrix
-                                    if self.SpecDataMatrix[y][x].fitmaxX >= self.wlstart and self.SpecDataMatrix[y][x].fitmaxX <= self.wlend:
+                                    if self.SpecDataMatrix[y][x].fitmaxX >= float(np.min(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart:self.aqpixend])) and self.SpecDataMatrix[y][x].fitmaxX <= float(np.max(self.SpecDataMatrix[y][x].WL_eV[self.aqpixstart:self.aqpixend])):
                                         worked = True
                                         PixMatrix[y][x] = self.SpecDataMatrix[y][x].get_attribute(variable)
                                     else:
@@ -2352,7 +2361,7 @@ class XYMap:
                                     PixMatrix[i][j] = np.nan 
                                 else:
                                     # check if maximum is within the window and set to Intmatrix
-                                    if self.SpecDataMatrix[i][j].fitmaxX >= self.wlstart and self.SpecDataMatrix[i][j].fitmaxX <= self.wlend:
+                                    if self.SpecDataMatrix[i][j].fitmaxX >= float(np.min(self.SpecDataMatrix[i][j].WL_eV[self.aqpixstart:self.aqpixend])) and self.SpecDataMatrix[i][j].fitmaxX <= float(np.max(self.SpecDataMatrix[i][j].WL_eV[self.aqpixstart:self.aqpixend])):
                                         worked = True
                                         PixMatrix[i][j] = self.SpecDataMatrix[i][j].get_attribute(variable)
                                     else:
@@ -2529,6 +2538,9 @@ class XYMap:
                                  [self.SpecDataMatrix[y][x].fitdata[:-1]], 
                                  [self.fitkeys[self.selectwindowboxVari][0]]
                                  )
+        # print fit parameters to console
+        print('Fit parameters for pixel ({}, {}):'.format(x, y))
+        print('Fit data:', self.SpecDataMatrix[y][x].fitdata)
 
     def PlotFitSpectrum(self, x, y, label, fitdata, fitfunc):
         self.readfontsize()
@@ -2538,7 +2550,8 @@ class XYMap:
         #plt.plot(x, fitfunc(x, *fitdata), label='Fitted function', color='red')
         self.selectwindowboxVari = self.selectwindowbox.get()
         print('Plotting fit for window function:', self.selectwindowboxVari)
-        print('Fit data:', fitdata)
+        # update self.fontsize: 
+        self.readfontsize()
         if self.sepfitfunct.get() == True:
             # plot double window function seperately
             if self.selectwindowboxVari == 'double gaussian':
