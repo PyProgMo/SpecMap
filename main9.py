@@ -127,7 +127,7 @@ class FileProcessorApp:
             self.notebook.add(frame, text=notebookentries[i])
             self.nodeframes[notebookentries[i]] = frame
         
-        if 'Marwins Spekplotter' in notebookentries and importmarwin:
+        if 'Marwins Specplotter' in notebookentries and importmarwin:
             # check if self.marwinspecplot is already created, if not create it
             if hasattr(self, 'marwin_specplot'):
                 self.marwin_specplot.clear()
@@ -136,12 +136,12 @@ class FileProcessorApp:
                 # before crating, check if marwin_specplotlib.HSIExplorer is available
                 try:
                     if hasattr(marwin_specplotlib, 'HSIExplorer'): # type: ignore
-                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter']) # type: ignore
+                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Specplotter']) # type: ignore
                     else:
-                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Spekplotter'])# type: ignore
+                        self.marwin_specplot = marwin_specplotlib.HSIExplorer(self.nodeframes['Marwins Specplotter'])# type: ignore
                 except Exception as e:
-                    error_handler.log_error(f"Error initializing Marwins Spekplotter: {e}") # type: ignore
-                    print(f"Failed to initialize Marwins Spekplotter: {e}")
+                    error_handler.log_error(f"Error initializing Marwins Specplotter: {e}") # type: ignore
+                    print(f"Failed to initialize Marwins Specplotter: {e}")
 
     def createbuttons(self, Notebook):
         # Create a canvas with scrollbars for the Load Data tab
@@ -328,8 +328,8 @@ class FileProcessorApp:
 
         # if Marwins specplotter importet
         if importmarwin:
-            # before parsing self.nodeframes['Marwins Spekplotter'] as root element, add x and y scrollbar
-            frame = self.nodeframes['Marwins Spekplotter']
+            # before parsing self.nodeframes['Marwins Specplotter'] as root element, add x and y scrollbar
+            frame = self.nodeframes['Marwins Specplotter']
             frame.grid_rowconfigure(0, weight=1)
             frame.grid_columnconfigure(0, weight=1)
             self.marwin_canvas = tk.Canvas(frame)
