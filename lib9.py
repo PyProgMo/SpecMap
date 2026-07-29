@@ -1725,9 +1725,15 @@ class XYMap:
 
         b1 = tk.Button(plotframe, text="Plot Spectrum", command=self.PlotPixelSpectrum)
         b1.pack(side=tk.TOP, anchor=tk.W)
+
+        # add a button to export the selected spectrum to a text file
+        b2 = tk.Button(plotframe, text="Export Spectrum at X Y to .txt", command=lambda: self.exportPixelSpectrum())
+        b2.pack(side=tk.TOP, anchor=tk.W)
+
         # Disable button if no data
         if not has_data:
             b1.config(state='disabled')
+            b2.config(state='disabled')
 
         if self.defentries['enable_buttonmatrix'] == True and has_data:
             b2 = tk.Button(parframe, text="Create Button Matrix", command= lambda: self.buildButtonMatrix(parframe, n, m)) # do not use the buttonmatrix !!!
@@ -1889,6 +1895,62 @@ class XYMap:
             import traceback
             traceback.print_exc()
             return None
+
+    def exportPixelSpectrum(self):
+        # Export the selected pixel spectrum to a text file
+        try:
+            x = int(self.selectPixX.get())
+            y = int(self.selectPixY.get())
+            # Get the selected data type from the combobox
+            selected_data_name = self.selectspecpixbox.get()
+            if selected_data_name not in self.speckeys:
+                print(f"Warning: Unknown data type '{selected_data_name}'. Defaulting to 'Spectrum (PL-BG)'.")
+            data_key = self.speckeys.get(selected_data_name, 'Spectrum (PL-BG)')
+            # Get the pixel spectrum object
+            pixel_obj = self.SpecDataMatrix[y][x]
+            metadata = getattr(pixel_obj, 'metadata', {})
+            if pixel_obj is not None and hasattr(pixel_obj, data_key):
+                data_array = getattr(pixel_obj, data_key)
+                # get "Select WL Axis" selection
+                wl_axis_selection = self.selectspecxbox.get()
+                unit = metadata.get('unit', 'A. U.')
+                wlunit = 'A. U.'
+                if wl_axis_selection == 'Energy (eV)':
+                    # Convert wavelength to energy
+                    wl_array = self.WL[:]
+                    energy_array = 1239.84193 / wl_array  # E(eV) = 1239.84193 / λ(nm)
+                    wl_array = energy_array
+                    wlunit = 'eV'
+                else:
+                    wl_array = self.WL[:]
+                    wlunit = 'nm'
+
+                if data_array is not None:
+                    # Prepare filename
+                    default_filename = f"PixelSpectrum_X{x}_Y{y}_{data_key}.txt"
+                    savename = tkfd.asksaveasfilename(initialfile=default_filename, defaultextension='.txt', filetypes=[('Text files', '*.txt')])
+                    if savename:
+                        # Save the spectrum to file testing: np.savetxt in this way lead to floating point problems. 
+                        # so we will use an fstring to combine the data and save it to file
+                        with open(savename, 'w') as f:
+                            # write metadata to the file
+                            for key, value in metadata.items():
+                                f.write(f"# {key}: {value}\n")
+                            f.write(f"# Pixel coordinates: X={x}, Y={y}\n")
+                            f.write(f"# Data type: {data_key}\n")
+                            f.write(f"# Wavelength axis: {wl_axis_selection}\n")
+                            f.write(f"\n")
+
+                            f.write(f'Wavelength / {unit}   Intensity / {wlunit}\n')
+                            for wl, intensity in zip(wl_array, data_array):
+                                f.write(f"{wl:.4f}   {intensity:.4f}\n")
+                        #np.savetxt(savename, np.column_stack((self.WL, data_array)), header='Wavelength(nm)  Intensity(A.U.)', comments='')
+                        print(f"Exported pixel spectrum at ({x}, {y}) to {savename}")
+                else:
+                    print(f"No data found for pixel ({x}, {y}) with data type '{data_key}'.")
+            
+        except Exception as e:
+            print(f"Error exporting pixel spectrum: {e}")
 
     def updateselectionentries(self):
         self.selectPixX.delete(0, tk.END)

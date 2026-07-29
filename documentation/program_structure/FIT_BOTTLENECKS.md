@@ -21,3 +21,6 @@ If a fit fails, the code shifts the window slightly (`incmin`/`incmax`) and retr
 
 ### 4. Code Duplication
 The `if mode == 'fullHSI':` and `elif mode == 'roi':` branches have 160+ identical lines of code. This does not strictly affect performance execution speed, but drastically increases the complexity of optimizing the aforementioned points.
+
+### 5. Remaining notes
+The data are measured as unsigned 16-bit integers, but are converted to float64 for fitting. This is a waste of memory and CPU cycles. The data should be converted to float32 at the very least, or even better, float16 if the fitting routine can handle it. Depending on the grating the resolution is currently 2-4 pixels per nm. For the fit, the data must be converted into eV, which is a non-linear transformation. This means that the data are being oversampled by a factor of 2-4x for the fit, which is unnecessary and wasteful. The data should be resampled to 1 pixel per eV before fitting.
