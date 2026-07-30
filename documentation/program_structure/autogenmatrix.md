@@ -137,7 +137,7 @@ spec = self.SpecDataMatrix[yind][xind]
 
 The following bugs were identified and fixed in `autogenmatrix` / `genmatgrid` / `SpecdataintoMatrix`.
 
-### Bug 1 — Floating-point coordinate mismatch ✅ Fixed
+### Bug 1 — Floating-point coordinate mismatch  Fixed
 
 **Scenario:** Two spectra share a physical coordinate in principle (e.g., both at `x = 10.0`) but their stored values differ by floating-point noise (e.g., `10.0` vs `10.000000001`).
 
@@ -150,7 +150,7 @@ The following bugs were identified and fixed in `autogenmatrix` / `genmatgrid` /
 
 ---
 
-### Bug 2 — Irregular step sizes and the `most_frequent` heuristic ✅ Fixed
+### Bug 2 — Irregular step sizes and the `most_frequent` heuristic  Fixed
 
 **Scenario:** The scan has a non-uniform step size (e.g., most steps are 1 µm but one gap is 2 µm due to a missed measurement).
 
@@ -163,7 +163,7 @@ The following bugs were identified and fixed in `autogenmatrix` / `genmatgrid` /
 
 ---
 
-### Bug 3 — Axis reconstruction accumulates rounding errors ✅ Fixed
+### Bug 3 — Axis reconstruction accumulates rounding errors  Fixed
 
 **Scenario:** `gdx` is an irrational or repeating decimal (e.g., `0.333…`).
 
@@ -175,7 +175,7 @@ The following bugs were identified and fixed in `autogenmatrix` / `genmatgrid` /
 
 ---
 
-### Bug 4 — Grid size under-count due to integer truncation ✅ Fixed
+### Bug 4 — Grid size under-count due to integer truncation  Fixed
 
 **Scenario:** `(x_max - x_min + gdx) / gdx` yields something like `4.9999999…` due to floating-point arithmetic.
 
@@ -196,7 +196,7 @@ nx = int(round((self.matend[0] - self.matstart[0] + self.gdx) / self.gdx))
 
 ---
 
-### Bug 5 — Collision on the same grid cell (silent discard) ✅ Fixed
+### Bug 5 — Collision on the same grid cell (silent discard)  Fixed
 
 **Scenario:** Two spectra have coordinates that both round to the same `(xind, yind)`.  
 This can happen because of Bugs 1–4, or genuinely overlapping scan positions.
@@ -210,7 +210,7 @@ This can happen because of Bugs 1–4, or genuinely overlapping scan positions.
 
 ---
 
-### Zero-step guard ✅ Added
+### Zero-step guard  Added
 
 **Scenario:** All spectra share the same X or Y coordinate, producing zero consecutive differences and a computed `gdx` or `gdy` of zero.
 

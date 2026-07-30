@@ -1,6 +1,6 @@
 # MAIN9.PY - SpecMap Application - Hauptmodul
 
-## 📋 Überblick
+## Überblickd
 
 **main9.py** ist das Hauptmodul der SpecMap-Anwendung und stellt die Benutzeroberfläche (GUI) für die Verarbeitung hyperspektraler Bilddaten (Hyperspectral Imaging - HSI) bereit. Die Anwendung ermöglicht dem Benutzer, verschiedene Arten von spektralen Daten zu laden, zu verarbeiten und zu visualisieren.
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 🏗️ Architektur und Komponenten
+## Architektur und Komponenten
 
 ### Hauptklassen
 
@@ -30,7 +30,7 @@ Spezialklasse für Batch-Verarbeitung und intelligente Dateiorganisation von HSI
 
 ---
 
-## 🖥️ GUI-Struktur und Komponenten
+## GUI-Struktur und Komponenten
 
 ### Notebook-Tabs (Reiter)
 
@@ -131,7 +131,7 @@ Load Section:
 
 ---
 
-## 📂 Datenverarbeitung und Workflows
+## Datenverarbeitung und Workflows
 
 ### 1. HSI-Daten Laden Workflow
 
@@ -185,7 +185,7 @@ Siehe Abschnitt **specfilesorter** weiter unten.
 
 ---
 
-## 🔧 FileProcessorApp - Detaillierte Methoden
+## FileProcessorApp - Detaillierte Methoden
 
 ### Initialisierung
 ```python
@@ -327,7 +327,7 @@ Hilfsfunktion: Filtert Elemente, die Substring enthalten.
 
 ---
 
-## 📦 specfilesorter - Batch Verarbeitung
+## specfilesorter - Batch Verarbeitung
 
 **Zweck:** Intelligente Organisation und Batch-Verarbeitung von HSI-Messdaten über mehrere Tage hinweg.
 
@@ -474,7 +474,7 @@ Löscht alle Scan-Ergebnisse und Auswahl.
 
 ---
 
-## 🧵 Thread-Management
+##  Thread-Management
 
 ### Thread-Typen
 
@@ -503,7 +503,7 @@ thread.join(timeout=0.5)  # mit Timeout
 
 ---
 
-## ⚙️ Abhängigkeiten und Importe
+## Abhängigkeiten und Importe
 
 | Modul | Zweck | Zeile |
 |-------|-------|-------|
@@ -529,7 +529,7 @@ thread.join(timeout=0.5)  # mit Timeout
 
 ---
 
-## 🔍 Fehlerbehandlung
+## Fehlerbehandlung
 
 ### Error Engine
 
@@ -581,7 +581,7 @@ except Exception as e:
 
 ---
 
-## 🚀 Startpunkt und Anwendungs-Lebenszyklus
+## Startpunkt und Anwendungs-Lebenszyklus
 
 ### `__main__` Block (Zeile 1370-1410)
 
@@ -642,7 +642,7 @@ def pressclose(root, app):
 
 ---
 
-## 📊 Workflow-Diagramme
+## Workflow-Diagramme
 
 ### HSI Laden - Ablauf
 
@@ -762,7 +762,7 @@ def pressclose(root, app):
 
 ---
 
-## 💾 Datenformate und Speicherung
+## Datenformate und Speicherung
 
 ### Pickle-Format für XYMap
 
@@ -869,7 +869,7 @@ defaults.txt
 
 ---
 
-## 📈 Performance-Überlegungen
+## Performance-Überlegungen
 
 ### Speicher-Management
 - **Garbage Collection:** `gc.collect()` nach Nanomap-Löschung
@@ -888,7 +888,7 @@ defaults.txt
 
 ---
 
-## 🐛 Debugging
+## Debugging
 
 ### Verwendeter Debugger
 ```python
@@ -909,19 +909,19 @@ error_engine = error_handler.ErrorEngine(
 
 ---
 
-## 📝 Zusammenfassung
+## Zusammenfassung
 
 **main9.py** ist ein ausgefeiltes Tkinter-basiertes Datenverarbeitungs-Tool für hyperspektrale Bilddaten mit folgenden Kernfeatures:
 
-✅ **Mehrere Datenquellen:** HSI, CLARA, Newton, TCSPC
-✅ **Intelligente Batch-Verarbeitung:** Mehrere HSIs hintereinander
-✅ **Automatisches Merging:** Folgemessungen zusammenfügen
-✅ **Cosmic Ray Entfernung:** Mit verschiedenen Algorithmen
-✅ **Derivat-Berechnung:** Erste und zweite Ableitungen
-✅ **Thread-Management:** Background-Processing ohne UI-Blockierung
-✅ **Persistance:** Speichern/Laden kompletter Verarbeitungszustände
-✅ **Error Handling:** Robustes Error-Handling und Logging
-✅ **Moderne UI:** With Canvas-Scrolling und Mousewheel-Support
+ **Mehrere Datenquellen:** HSI, CLARA, Newton, TCSPC
+ **Intelligente Batch-Verarbeitung:** Mehrere HSIs hintereinander
+ **Automatisches Merging:** Folgemessungen zusammenfügen
+ **Cosmic Ray Entfernung:** Mit verschiedenen Algorithmen
+ **Derivat-Berechnung:** Erste und zweite Ableitungen
+ **Thread-Management:** Background-Processing ohne UI-Blockierung
+ **Persistance:** Speichern/Laden kompletter Verarbeitungszustände
+ **Error Handling:** Robustes Error-Handling und Logging
+ **Moderne UI:** With Canvas-Scrolling und Mousewheel-Support
 
 ---
 
