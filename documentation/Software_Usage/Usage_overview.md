@@ -100,3 +100,42 @@ How2Use:
 For processing and save multiple folders as Images see Load data "Process Muliple HSIs". There Set File Main Directory, Save Images Directory (where to save the Images), Save HSI objects Directory (where to save the HSI .pkl files) and click "Process Multiple HSIs". This will process all HSI measurements in the Main Directory and save the Images and HSI objects in the selected directories.
 
         
+### Plot Spectra
+Frame Design:
+
+![Plot Spectra Notebook Frame](ProjectImages/Plot_Spectra_notebook_Data_Selection.png)
+![Plot Spectra Notebook Frame](ProjectImages/Plot_Spectra_notebook_Plot_Options.png)
+
+Explenation of the Task of this Notebook:
+- Plot the spectra in Hyperspectra within the "Select Spectral Data" frame. This contains spectra of the current loaded Hyperspectra object. which are averaged Spectra of the selected HSI (can be HSI or HSI * ROI).
+IMPORTANT: before using the Plot Options, go to Data Selection, press:
+- "Refresh Data", then select the checkboxes what u want to plot (click on column/row names to select full row/column) and set the theckboxes for the selection. 
+- If all desired spectra are selected press "Transfer to Plot Options" to transfer the selected spectra to the "Plot Options" frame.
+
+Inside the Plot options, you can set the Plot Options, like:
+- Axes Limits
+- formatting
+- Axes Labels
+
+Generate a Plot on "Plot" and play around with the parameters. this should be it. 
+
+### Cube2Image
+Frame Design:
+
+![Cube2Image Notebook Frame](ProjectImages/Cube2Image_notebook_frame.png)
+- The Cube2Image notebook is used for converting hyperspectral data cube into an 2D Image. 
+- Set Dataset and move the sliders to select the desired wavelength range. 
+- Click on "Create HSI" to set the exact settings to the Hyperspectra notebook and create a HSI with the selected wavelength range and dataset. 
+- Note: Besides the sliders, the Center WL and WL Range can be set manually via the entires. After inserting the values, click Set WL to update the slicers and the Image. 
+
+### Settings
+Not yet implemented. Use defaults.txt instead. Note, that default values can be set in defaults.txt. See documentation/Software_Usage/Defaults.txt for more information. Typses and fallbacks are specified in deflib1.py.
+
+# Marwins Specplotter
+Frame Design:
+![Marwins Specplotter Notebook Frame](ProjectImages/Marwins_Specplotter_notebook_frame.png)
+
+Explenation of the Task of this Notebook:
+- This notebook is used to plot multiple spectra from .txt files. The spectra can be loaded on the corresponding Load Data notebook entry. (Select the folder with the spectra as .txt files, then click "Load Marwins Plotter")
+
+The Frame works quite simple: click on pixels ont he Image (left click) to show the spectrum. Right click to remove the spectra from the plot in the selected order. Use Normalization, Clear, Save CSV, Save PNG buttons. That is it. 
