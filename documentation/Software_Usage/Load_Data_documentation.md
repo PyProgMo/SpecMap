@@ -1,4 +1,8 @@
 # Load Data Notebook Documentation
+Notebook Frame Design:
+
+![Load Data Notebook Frame](ProjectImages/Load_Data_notebook_frame.png)
+
 Most of the loadings are rather self-explainatory, but there are a few things must bespecified in detail: 
 - The pkl loading and saving is done using the `pickle` library, which is a standard way to serialize and deserialize Python objects. This pickeling compresses objects according to the project structure. Reloading this objects requires the same project structure as when the objects were saved. If the project structure changes, the pickled objects may not load correctly. 
 - The top Notebook "Select folder with spectra for Hyperspectral processing" is the main entry point for loading data. It allows users to select a folder containing hyperspectral data files and initiate the loading process. The notebook provides options for specifying the file format, preprocessing steps, and any additional parameters required for loading the data correctly. It can be used as follows:
