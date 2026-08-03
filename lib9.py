@@ -2750,6 +2750,7 @@ class XYMap:
         cax = ax.imshow(HSIimage, cmap=self.colormap.get()) # aspect='auto' for cubic image
         # Add a colorbar to the image
         cbar = fig.colorbar(cax, ax=ax)
+        fig.canvas.manager.set_window_title('Pixel Matrix: {}'.format(HSIname)) #type: ignore
         # Set the colorbar label
         leglabel = ''
         if 'quantity' in self.PMdict[HSIname].metadata:
