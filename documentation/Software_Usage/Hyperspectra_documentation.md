@@ -48,6 +48,48 @@ Normalization methods:
 | `counts_at_wavelength` | Normalizes by the signal at one specific wavelength (e.g. reference/calibration line) | `1 / data[closest_index_to(wavelength)]` | `wavelength`, `data_key` |
 | `normalize_intern` | Special case: min-max normalization applied to the final pixel map (post-hoc, not per-spectrum) | `(pixel - min) / (max - min)` across the whole map | — |
 
+![Plot single spectrum](ProjectImages/Plot_singlespec.png)
+
+Plot the spectrum at position X Y, selection can be entered maually or by clicking on the HSI. The spectrum is displayed in a new window. The user can select the data set to be used for plotting the spectrum. Available datasets are: the raw data, background, background subtracted data (default) and the derivatives calculated in the loading tab. To export the spectrum click "Export Spectrum at X Y to .txt". 
+
+![Fitting](ProjectImages/Fitting.png)
+- To fit a spectrum, select start and end wavelength and a fit function. The fit is carried out pixel-wise for all pixels in the HSI. The resulting fit parameters are stored in the metadata of the HSI and can be used for further analysis or visualization. The user can select the data set to be used for fitting the spectrum. Available datasets are: the raw data, background, background subtracted data (default) and the derivatives calculated in the loading tab. 
+- The fit is carried out for each pixel (above the threshold) with a click on "Create spectral maximum colormap". 
+- To plot a single spectrum with the fit, click "plot existing fit and spectrum". This uses the selected Pixel X Y. For none-trivial functions "Seperate Fit functions" plots e g 2 gaussian peaks fromt he fit seperately. 
+- To redo the Fit for one spectrum click "Fit Window to Spectrum". 
+- To create a HSI of the fit parameters, click "Plot HSI from Fit Parameter" (enable "Use ROI for parameter plot" to use the selected ROI mask for the HSI).
+
+![Datatypes](ProjectImages/hyperspectra_data_comboboxes.png)
+- 3 columns, 3 comboboxes: ROIs, HSIs, Spectra
+- Most important the "Select HSI Image" column. The selected HSI is used for the buttons below
+    - "Plot HSI" => plot the HSI
+    - "Multiply HSI with ROI" => multiply the selected HSI with the selected ROI mask and plot the result. This is useful to focus on a specific area of interest in the HSI. 
+    - "Delete selected HSI" => delete the selected HSI from the list of available HSIs. The HSI is also deleted from the metadata of the data set.
+    - "Save selected HSI" => save the selected HSI to a file. The user can choose the file format and location for saving the HSI. The saved HSI can be used for further analysis or visualization in other software.
+    - "Load HSI" => load a previously saved HSI from a file. The user can choose the file format and location for loading the HSI. The loaded HSI will be added to the list of available HSIs in the notebook.
+    - "Export HSI to .txt" => export the selected HSI to a text file. The user can choose the file format and location for exporting the HSI. The exported HSI can be used for further analysis or visualization in other software.
+    - "Export HSI to .itx" => export the selected HSI to an Igor Pro .itx file. The user can choose the file format and location for exporting the HSI. The exported HSI can be used for further analysis or visualization in Igor Pro software.
+
+- The "Select ROI" column allows the user to select a region of interest (ROI) from the list of available ROIs. The selected ROI can be used for various tasks, such as masking the HSI, fitting spectra within the ROI, and plotting spectra from the ROI. The user can also create new ROIs by selecting a region in the HSI and saving it as a new ROI.
+    - "ROI Edting last Selection" => the user can select an ROI by clicking. 
+    ![ROI Selection](ProjectImages/ROI_selection.png)
+        - click on "Save ROI" to save the selected ROI. The user can choose the name and location for saving the ROI. The saved ROI will be added to the list of available ROIs in the combobox. 
+        - click on "Clear ROI" to restart the selection process. The user can select a new ROI by clicking on the HSI.
+    - "Plot ROI" => plot the selected ROI as a binary mask. The ROI is displayed as a white region on a black background. The user can use this plot to visualize the selected ROI and verify its accuracy.
+    - "Plot ROI on HSI" => plot the selected ROI on top of the selected HSI. The ROI is displayed as a semi-transparent overlay on the HSI. The user can use this plot to visualize the selected ROI in the context of the hyperspectral image and verify its accuracy.
+    - "Plot multiple ROIs on HSI" => plot multiple selected ROIs on top of the selected HSI. The ROIs are displayed as semi-transparent overlays on the HSI. The user can use this plot to visualize multiple ROIs in the context of the hyperspectral image and verify their accuracy. Enter the indicees 1, 2, ... into the box above the button. if Nothing entered, all ROIs are plotted.
+    - "delete ROI" => delete the selected ROI from the list of available ROIs. The ROI is also deleted from the metadata of the data set.
+
+- The "Select Spectrum" column allows the user to select a spectrum from the list of available spectra. The selected spectrum can be used for various tasks, such as plotting the spectrum, fitting the spectrum, and exporting the spectrum to a file. The spectra plotted here are averaged over the selected HSI. If no Spectrum is present (empty combobox) use "average hsi to spectrum" first. Crosslink to the "Plot Spectra" Notebook: on "Refresh Data" the spectra are updated.
+    - "Plot Spectrum" => plot the selected spectrum. The spectrum is displayed in a new window. The user can use this plot to visualize the selected spectrum and verify its accuracy. This will plot the spectrum, then the first and then the 2nd derivative. 
+    - "Save Spectrum to .txt" => save the selected spectrum to a text file. The user can choose the file format and location for saving the spectrum. The saved spectrum can be used for further analysis or visualization in other software.
+    - "Delete selected Spectral Data" => delete the selected spectrum from the list of available spectra. The spectrum is also deleted from the metadata of the data set.
+    - "average hsi to spectrum" => average the selected HSI and create a new spectrum. The new spectrum is added to the list of available spectra in the combobox. The user can use this function to create a representative spectrum for a specific region of interest in the hyperspectral image. 
+        Important: If the user wants to average a region, first multiply the ROI to the HSI and then average the resulting HSI to a spectrum. This will ensure that only the pixels within the selected ROI are included in the averaging process. 
+    - "Export All Averaged Spectra" => export all averaged spectra to a text file. The user can choose the file format and location for exporting the spectra. The exported spectra can be used for further analysis or visualization in other software.
+    - "Select Correction Spec File" => select a correction spectrum file to be used for correcting the selected spectrum. The correction spectrum is subtracted from the selected spectrum to correct for any background or baseline effects. The user can choose the file format and location for selecting the correction spectrum file. The corrected spectrum can be used for further analysis or visualization in other software.
+    - "Correct spectrum" => correct the selected spectrum using the selected correction spectrum file. The corrected spectrum is displayed in a new window. The user can use this plot to visualize the corrected spectrum and verify its accuracy.
+
 # Tasks and Functionalities
 1. Create a HSI by integration: 
 ![Create HSI by Integration](ProjectImages/Hyperspectra_usage1.png)
