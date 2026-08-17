@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from collections import OrderedDict
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -7,6 +8,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 class Cube2ImageGUI:
+    # Number of datatype cubes to keep cached simultaneously.
+    # Each cached cube costs rows*cols*n_wl*8 bytes (float64) x2 (cube + cumsum),
+    # so keep this small for large hyperspectral maps.
+    CUBE_CACHE_SIZE = 2
+
     def __init__(self, root, Nanomap=None, wlstart=0.0, wlend=1000.0, zoomlen=700.0):
         try: 
             self.wlstart = float(wlstart)
@@ -29,6 +35,12 @@ class Cube2ImageGUI:
         self.colormaps = [cmap for cmap in self.colormaps if cmap in plt.colormaps()]
         self.colormap = 'viridis'
         self.default_colormap = 'viridis'
+
+        # --- performance cache: dt_label -> (wl, cumsum) ---
+        # cumsum has shape (rows, cols, n_wl+1), cumsum[:,:,k] = sum of band[0:k]
+        # along the wavelength axis, so any window sum is a single slice/subtract.
+        self._cube_cache = OrderedDict()
+        self._cached_smat_id = None  # identifies which SpecDataMatrix the cache belongs to
         
         main_frame = ttk.Frame(self.root, padding='10')
         main_frame.grid(row=0, column=0, sticky='nsew')
@@ -155,6 +167,62 @@ class Cube2ImageGUI:
         start = centerwl - half_width
         end = centerwl + half_width
         return centerwl, width, start, end
+
+    # Optimized Version for faster performance: cache the computed cubes for each datatype, and only recompute if the underlying SpecDataMatrix changes (detected by id()). Optimization procedure provided by claude. 
+    def invalidate_cube_cache(self):
+        """Call this whenever Nanomap.SpecDataMatrix contents change
+        (e.g. after createHSI/buildandPlotIntCmap regenerates spectra),
+        or when a new Nanomap is attached. Cheap - just drops cached arrays."""
+        self._cube_cache.clear()
+        self._cached_smat_id = None
+
+    def _get_cube(self, dt):
+        """Return (wl, cumsum) for datatype `dt`, building & caching it once.
+
+        cumsum has shape (rows, cols, n_wl + 1) with cumsum[..., 0] = 0, so that
+        the integral over wl indices [i0, i1) for every pixel simultaneously is
+        just cumsum[..., i1] - cumsum[..., i0] -- one vectorized numpy op,
+        independent of band width or number of pixels.
+        """
+        smat = self.Nanomap.SpecDataMatrix
+        smat_id = id(smat)
+        if smat_id != self._cached_smat_id:
+            # underlying data object changed (new scan / new Nanomap) - drop stale cache
+            self._cube_cache.clear()
+            self._cached_smat_id = smat_id
+
+        cached = self._cube_cache.get(dt)
+        if cached is not None:
+            # mark as most-recently-used
+            self._cube_cache.move_to_end(dt)
+            return cached
+
+        wl = getattr(smat[0][0], 'WL', None)
+        if wl is None:
+            return None
+        wl = np.asarray(wl, dtype=float)
+
+        rows = len(smat)
+        cols = len(smat[0])
+        n_wl = wl.shape[0]
+
+        cube = np.zeros((rows, cols, n_wl), dtype=float)
+        for i in range(rows):
+            row = smat[i]
+            for j in range(cols):
+                data = getattr(row[j], dt, None)
+                if data is not None:
+                    cube[i, j, :] = data
+
+        cumsum = np.empty((rows, cols, n_wl + 1), dtype=float)
+        cumsum[:, :, 0] = 0.0
+        np.cumsum(cube, axis=2, out=cumsum[:, :, 1:])
+
+        result = (wl, cumsum)
+        self._cube_cache[dt] = result
+        if len(self._cube_cache) > self.CUBE_CACHE_SIZE:
+            self._cube_cache.popitem(last=False)  # evict least-recently-used
+        return result
     
     def update_plot(self, *args):
         centerwl = float(self.wlcenter.get())
@@ -178,15 +246,14 @@ class Cube2ImageGUI:
             return
         
         try:
-            wl = getattr(self.Nanomap.SpecDataMatrix[0][0], 'WL', None)
-            if wl is not None:
-                idx = np.where((wl >= start) & (wl <= end))[0]
-                img = np.zeros((len(self.Nanomap.SpecDataMatrix), len(self.Nanomap.SpecDataMatrix[0])))
-                for i in range(img.shape[0]):
-                    for j in range(img.shape[1]):
-                        data = getattr(self.Nanomap.SpecDataMatrix[i][j], dt, np.zeros_like(wl))
-                        img[i, j] = np.sum(data[idx])
-                
+            cached = self._get_cube(dt)
+            if cached is not None:
+                wl, cumsum = cached
+                # wl assumed monotonically increasing (as in the original np.where mask)
+                i0 = int(np.searchsorted(wl, start, side='left'))
+                i1 = int(np.searchsorted(wl, end, side='right'))
+                img = cumsum[:, :, i1] - cumsum[:, :, i0]
+
                 self._draw_image(img, title=f'{dt_label}: {start:.1f} - {end:.1f} nm')
                 return
         except Exception as e:
@@ -243,6 +310,10 @@ class Cube2ImageGUI:
         if hasattr(self.Nanomap, 'buildandPlotIntCmap'):
             try:
                 self.Nanomap.buildandPlotIntCmap(savetoimage='False', plot=False, datatype=dt, wlstart=round(wlstart, 2), wlend=round(wlend, 2))
+                # buildandPlotIntCmap may have mutated SpecDataMatrix entries in place
+                # (same object id), so an id()-based cache check wouldn't catch it -
+                # invalidate explicitly to avoid serving stale cached spectra.
+                self.invalidate_cube_cache()
                 self.update_plot()
             except Exception as e:
                 self._clear_plot()
@@ -278,7 +349,8 @@ class Cube2ImageGUI:
             plt.close(self.fig)
         except Exception:
             pass
-        # break references so tkinter can close cleanly
+        # drop cached cubes and references so tkinter/gc can close cleanly
+        self._cube_cache.clear()
         self.Nanomap = None
         self.root = None
 
