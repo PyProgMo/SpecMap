@@ -20,6 +20,8 @@ import error_handler as error_handler  # Centralized error handling and logging
 import datetime as datet
 import plotspecs as plotspecs
 import cube2image as cube2image
+import loadXYspecs as loadXYspecs
+
 try:
     import marwin_specplot.marwin_specplot1 as marwin_specplotlib
     importmarwin = True
@@ -91,7 +93,9 @@ class FileProcessorApp:
             False, False, False, 
             20, 3, list(deflib1.cosmicfuncts.keys())[0], 
             self.defaults, self.derivative_polynomarray,
-            self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool
+            self.calc_norm_and_deriveBool, 
+            self.calc_norm_on_intensityBool, 
+            loadingfunction=self.loadingmethod_var.get()
         )
         #self.Nanomap.build_gui()  # Build GUI components now
         
@@ -789,7 +793,9 @@ class FileProcessorApp:
                 bool(self.multiple_BG.get()), bool(self.linearBG.get()), bool(self.removecosmicsBool.get()), 
                 self.cosmicthreshold, self.cosmicwidth, self.cosmicremoval.get(), 
                 self.defaults, self.derivative_polynomarray,
-                self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool
+                self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool, 
+                # get loading function from combobox selection from self.loadingmethod_combobox variable self.loadingmethod_var
+                loadingfunction=self.loadingmethod_var.get()
                 )
             if self.powercorrectionBool.get() == 1:
                 self.Nanomap.powercorrection()
@@ -951,7 +957,8 @@ class FileProcessorApp:
                 20, 3, list(deflib1.cosmicfuncts.keys())[0], 
                 self.defaults, self.derivative_polynomarray,
                 self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool,
-                skip_gui_build=True  # Don't build GUI yet - will build after loading data
+                skip_gui_build=True, # Don't build GUI yet - will build after loading data
+                loadingfunction=self.loadingmethod_var.get()
             )
             
             # Create Exporter

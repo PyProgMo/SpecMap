@@ -5,8 +5,6 @@ import memory_tracker as memory_tracker
 import threading as thre
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-
 loadingmethods = ['PLM Spectra']
 
 def loadPLMspecs(self):
@@ -79,7 +77,7 @@ def loadPLMspecs(self):
     self.WL_eV = deflib.wl_array_to_ev(self.WL.copy())
 
     # parallel loading of spectra
-    self.parallel_load_spectra()
+    parallel_load_spectra(self)
     del lines
 
 def parallel_load_spectra(self):
@@ -148,7 +146,7 @@ def parallel_load_spectra(self):
     # after spectra are loaded, they must be put into matrix, after this, correlated cosmic ray removal can be applied (see autogenmatrix) # correlatedcosmicrayremoval
 
 def load_spectrum(fname, instance, lock):
-    specobj = SpectrumData(
+    specobj = deflib.SpectrumData(
         fname,
         instance.WL,
         instance.BG,
