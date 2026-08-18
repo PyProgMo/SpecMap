@@ -218,10 +218,15 @@ class FileProcessorApp:
 
         # 2. Combobox with loading methods
         self.loadingmethod_var = tk.StringVar()
+        loadingmethods = ["PLM Spectra"]  # Add more methods as needed
+        if hasattr(deflib1, 'Loadingmethods'):
+            if isinstance(deflib1.Loadingmethods, list):
+                if "PLM Spectra" in deflib1.Loadingmethods:
+                    loadingmethods = deflib1.Loadingmethods
         self.loadingmethod_combobox = ttk.Combobox(
             self.loadingmethodrow,
             textvariable=self.loadingmethod_var,
-            values=["Method A", "Method B", "Method C"],  # replace with your actual method names
+            values=loadingmethods,  # replace with your actual method names
             state="readonly",
             width=20
         )

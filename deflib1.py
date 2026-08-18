@@ -14,6 +14,7 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import Rectangle
 
 Notebooks = ['Load Data', 'Hyperspectra', 'Clara Image', 'HSI Plot', 'Newton Spectrum', 'TCSPC', 'HSI File Sorter', 'Plot Spectra', 'Cube2Image', 'Settings', 'Marwins Specplotter']
+Loadingmethods = ['PLM Spectra']
 # dir of this file
 DIR = os.path.dirname(os.path.abspath(__file__))
 # Default values for the application
