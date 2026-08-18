@@ -20,6 +20,8 @@ import error_handler as error_handler  # Centralized error handling and logging
 import datetime as datet
 import plotspecs as plotspecs
 import cube2image as cube2image
+import loadXYspecs as loadXYspecs
+
 try:
     import marwin_specplot.marwin_specplot1 as marwin_specplotlib
     importmarwin = True
@@ -91,7 +93,9 @@ class FileProcessorApp:
             False, False, False, 
             20, 3, list(deflib1.cosmicfuncts.keys())[0], 
             self.defaults, self.derivative_polynomarray,
-            self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool
+            self.calc_norm_and_deriveBool, 
+            self.calc_norm_on_intensityBool, 
+            loadingfunction=self.loadingmethod_var.get()
         )
         #self.Nanomap.build_gui()  # Build GUI components now
         
@@ -203,9 +207,42 @@ class FileProcessorApp:
         self.fileformat_entry = tk.Entry(self.open_frame)
         self.fileformat_entry.pack(fill=tk.X)
         self.fileformat_entry.insert(0, defaults['file_extension'])
-        # Process button
-        self.process_button = tk.Button(self.open_frame, text="Load HSI data", command=self.init_spec_loadfiles)
-        self.process_button.pack()
+
+
+        # start of the modular loader frame: add combobox with different Hyperspectral loading functions
+        self.loadingmethodframe = tk.Frame(self.open_frame, borderwidth=2, relief="sunken")
+
+        # Row frame containing: label, method combobox, and load button
+        self.loadingmethodrow = tk.Frame(self.loadingmethodframe)
+        self.loadingmethodrow.pack(fill="x", padx=5, pady=5)
+
+        # 1. Label
+        self.loadingmethod_label = tk.Label(self.loadingmethodrow, text="Select loading method")
+        self.loadingmethod_label.pack(side="left", padx=(0, 5))
+
+        # 2. Combobox with loading methods
+        self.loadingmethod_var = tk.StringVar()
+        loadingmethods = ["PLM Spectra"]  # Add more methods as needed
+        if hasattr(deflib1, 'Loadingmethods'):
+            if isinstance(deflib1.Loadingmethods, list):
+                if "PLM Spectra" in deflib1.Loadingmethods:
+                    loadingmethods = deflib1.Loadingmethods
+        self.loadingmethod_combobox = ttk.Combobox(
+            self.loadingmethodrow,
+            textvariable=self.loadingmethod_var,
+            values=loadingmethods,  # replace with your actual method names
+            state="readonly",
+            width=20
+        )
+        self.loadingmethod_combobox.current(0)
+        self.loadingmethod_combobox.pack(side="left", padx=5)
+
+        # 3. Load button
+        self.process_button = tk.Button(self.loadingmethodrow, text="Load HSI data", command=self.init_spec_loadfiles)
+        self.process_button.pack(side="left", padx=5)
+
+        self.loadingmethodframe.pack(fill="x", padx=5, pady=5)
+
         # space between frames
         tk.Frame(self.open_frame, height=10).pack()
 
@@ -756,7 +793,9 @@ class FileProcessorApp:
                 bool(self.multiple_BG.get()), bool(self.linearBG.get()), bool(self.removecosmicsBool.get()), 
                 self.cosmicthreshold, self.cosmicwidth, self.cosmicremoval.get(), 
                 self.defaults, self.derivative_polynomarray,
-                self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool
+                self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool, 
+                # get loading function from combobox selection from self.loadingmethod_combobox variable self.loadingmethod_var
+                loadingfunction=self.loadingmethod_var.get()
                 )
             if self.powercorrectionBool.get() == 1:
                 self.Nanomap.powercorrection()
@@ -918,7 +957,8 @@ class FileProcessorApp:
                 20, 3, list(deflib1.cosmicfuncts.keys())[0], 
                 self.defaults, self.derivative_polynomarray,
                 self.calc_norm_and_deriveBool, self.calc_norm_on_intensityBool,
-                skip_gui_build=True  # Don't build GUI yet - will build after loading data
+                skip_gui_build=True, # Don't build GUI yet - will build after loading data
+                loadingfunction=self.loadingmethod_var.get()
             )
             
             # Create Exporter

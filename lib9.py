@@ -24,220 +24,16 @@ import error_handler as error_handler  # Centralized error handling and logging
 import hsi_normalization as hsi_normalization  # HSI normalization module
 import memory_tracker as memory_tracker  # Memory tracking and logging
 import roihandler as roihandler 
+import loadXYspecs as loadXYspecs  # Import the loadXYspecs module for loading spectral data
 import copy
 
-SpectDataFloats = ['Slit Width (µm)', 'Central Wavelength (nm)',
-                   'Cooling Temperature (°C)',
-                   'Exposure Time (s)',
-                   #'Wavelength First Pixel (nm)', # is obtained from WL
-                   #'Wavelength Last Pixel (nm)',
-                   'Delta Wavelength (nm)',
-                   'x-position',
-                   'y-position',
-                   'z-position',
-                   'Short Wavelength (nm)',
-                   'Long Wavelength (nm)',
-                   'magnification']
-
-# todo: make the load data function in the SpectrumData class more robust for statistical cosmic removal
-
-class SpectrumData:
-    def __init__(self, filename, WL, BG, loadeachbg = False, linearbg=False, removecosmics=False, cosmicthreshold=20, cosmicpixels=3, removecosmicmethod=list(deflib.cosmicfuncts.keys())[0], WL_eV=None, default_dataset='Spectrum (PL-BG)'):
-        self.removecosmicsmethod = removecosmicmethod
-        self.loadeachbg = loadeachbg
-        self.linearbg = linearbg
-        self.removecosmics = removecosmics
-        self.cosmicthreshold = cosmicthreshold
-        self.cosmicpixels = cosmicpixels
-        self.WL = WL
-        self.WL_eV = WL_eV
-        self.dofit = False # set True if fit is done
-        if self.loadeachbg == True:
-            self.BG = []
-        else:
-            self.BG = BG
-        self.filename = filename
-        self.readinkeys = ['BG', 'PL'] # WL is defined in XYMap
-        self.default_dataset = default_dataset
-        self.openFstate = [] # open floats state from metadata
-        self.openDstate = [] # open Data from spectrometer
-        self.dataokay = False    # set True if everything openend properly
-        self.data = {}
-        self.roistore = {}
-        self.PL = []
-        self.PLB = [] # PL-BG
-        self.Specdiff1 = None # first derivative dPLB/dWL (None until calculated)
-        self.Specdiff2 = None # second derivative d2PLB/dWL2 (None until calculated)
-        self._read_file()
-
-        # init fit data
-        self.fwhm = np.nan
-        self.fitmaxX = np.nan
-        self.fitmaxY = np.nan
-        self.fitdata = [None] # only fit parameter are stored, not the fit itself
-        # what is inside fitdata after the fit is done? 
-        # a sub array for each fit function (look at matl.fitkeys)
-        # each array contains the fit output parameters (fitkeys[function][4], which is the number of parameters), followed by:
-        # ['ss_res', 'ss_tot', 'r_squared', 'fwhm', 'pixstart', 'pixend', 'wlstart', 'wlend', 'max_x', 'max_y']
-        #  fitmaxX[-1] fitmaxY[-2] aqpixstart[-3] aqpixend[-4] r_squared[-7] 'ss_res'[-8] 'ss_tot'[-9] 
-        self.fitparams = matl.buildfitparas() # store all fit parameters
-        self.fitparamunits = matl.buildfitparas()
-
-    def _read_file(self):
-        """
-        Read spectrum data from file.
-        
-        Uses centralized error handling via ErrorEngine when available.
-        Uses get_default_error_engine() to access shared error handler instance.
-        Maintains dataokay flag to signal file read success/failure.
-        """
-        # Get default error engine (shared singleton instance)
-        # This is safe to use from any thread/context
-        error_engine = error_handler.get_default_error_engine()
-        #default_decoding = 'utf-8'  # Default encoding for reading files
-
-        try:
-            with open(self.filename, 'r') as file:
-                lines = file.readlines()
-        except Exception as e:
-            # Use ErrorEngine for file open errors
-            error_engine.error(
-                exception=e,
-                context="Opening spectrum file",
-                filename=self.filename,
-                action="file_open"
-            )
-            # Maintain existing dataokay behavior
-            self.dataokay = False
-            return
-
-        # Process lines to store variables
-        startreaddata = False
-        for line in lines:
-            if ':' in line:
-                key, value = map(str.strip, line.split(':', 1))
-                if key in SpectDataFloats:
-                    try:
-                        self.data[key] = float(value)
-                    except Exception as e:
-                        # Use ErrorEngine for parsing errors
-                        error_engine.warning(
-                            message=f"Could not parse float value for key '{key}'",
-                            context="Parsing spectrum metadata",
-                            filename=self.filename,
-                            key=key,
-                            value=value
-                        )
-                        self.data[key] = value
-                        self.openFstate.append(False)
-                else:
-                    self.data[key] = value
-            elif '\t' in line:  # Data lines with tabs
-                parts = line.split()
-                if startreaddata == False:
-                    count = 0
-                    # start reading if at least two keys in the line
-                    for i in parts:
-                        if i in self.readinkeys:
-                            count += 1
-                    if count > 1:
-                        startreaddata = True
-                elif startreaddata == True:
-                    try:
-                        if self.loadeachbg == True:
-                            #self.BG.append(int(parts[1]))
-                            print("Warning: loadeachbg is True, but BG data is not being loaded. Check implementation.")
-                        #self.WL.append(float(parts[0]))  WL is only read once by XYMap since each SpectrumData has the same WL-axis
-                        self.PL.append(int(parts[2])) # type: ignore
-                    except Exception as e:
-                        # Use ErrorEngine for data parsing errors
-                        error_engine.error(
-                            exception=e,
-                            context="Parsing spectrum data line",
-                            filename=self.filename,
-                            line_content=line.strip()
-                        )
-        if self.loadeachbg == True and self.linearbg == True:
-            av = np.mean(self.BG)
-            for i in range(len(self.BG)):
-                self.BG[i] = av
-
-        # Convert PL (and BG for loadeachbg) to float32 numpy arrays to reduce RAM usage
-        self.PL = np.array(self.PL, dtype=np.float32)
-        if self.loadeachbg == True:
-            self.BG = np.array(self.BG, dtype=np.float32)
-
-        try:
-            self.PLB = np.subtract(self.PL, self.BG).astype(np.float32) # add PLB = PL-BG
-        except Exception as e:
-            # Use ErrorEngine for background subtraction errors
-            error_engine.error(
-                exception=e,
-                context="Background subtraction",
-                filename=self.filename,
-                PL_length=len(self.PL),
-                BG_length=len(self.BG)
-            )
-        # write openstate list
-        for i in SpectDataFloats:
-            if i not in list(self.data.keys()):
-                self.openFstate.append(False)
-        if len(self.WL) == 0:
-            self.openDstate.append(None)
-        if len(self.BG) == 0:
-            self.openDstate.append(None)
-        if len(self.PL) == 0:
-            self.openDstate.append(None)
-        self.setOK()
-        # remove cosmic rays todo: add nearest neighbor method
-        if self.removecosmics == True:
-            try:
-                self.PLB = np.asarray(deflib.cosmicfuncts[self.removecosmicsmethod](self.PLB, self.cosmicthreshold, self.cosmicpixels), dtype=np.float32)
-            except Exception as e:
-                # Use ErrorEngine for cosmic removal errors
-                error_engine.error(
-                    exception=e,
-                    context="Cosmic ray removal",
-                    filename=self.filename,
-                    method=self.removecosmicsmethod,
-                    threshold=self.cosmicthreshold
-                )
-        
-        # if 
-        
-        # important: clean up! delete everything that is not needed anymore
-        del lines
-
-    def setOK(self):
-        if False in self.openFstate:
-            pass
-        elif None in self.openDstate:
-            pass
-        else:
-            self.dataokay = True
-
-    # return a specific attribute of this class
-    def get_attribute(self, attr_name:str):
-        try:
-            return getattr(self, attr_name)
-        except AttributeError as e:
-            print("Attribute {} not found in class SpectrumData.".format(attr_name))
-    
-    def __del__(self):
-        """Destructor to clean up resources"""
-        # Clear large data arrays to help garbage collector
-        if hasattr(self, 'PL'):
-            self.PL = []
-        if hasattr(self, 'BG'):
-            self.BG = []
-        if hasattr(self, 'PLB'):
-            self.PLB = []
-        # Note: WL is shared reference, don't clear it
-
+# in older versions, here Spectrum data was defined. Due to the modular loading this had to be moved to lib9.py
+# for the pickle loading to work, the SpectrumData class must be defined in the same module as the XYMap class, so we define it here to use the same implementation as in lib9.py. The SpectrumData class is now imported from deflib1, which is assumed to be the same as lib9.py.
+SpectrumData = deflib.SpectrumData
 
 # create XY Map that contains the Pixels 
 class XYMap:
-    def __init__(self, fnames, cmapframe, specframe, loadbg=False, linearbg=False, removecosmics=False, cosmicthreshold=20, cosmicpixels=3, cosmicmethod=list(deflib.cosmicfuncts.keys())[0], defentries=deflib.defaults, derivative_polynomarray=[None, None, None, None], calc_norm_and_derive=None, calc_norm_on_intensity=None, skip_gui_build=False, default_dataset='Spectrum (PL-BG)'):
+    def __init__(self, fnames, cmapframe, specframe, loadbg=False, linearbg=False, removecosmics=False, cosmicthreshold=20, cosmicpixels=3, cosmicmethod=list(deflib.cosmicfuncts.keys())[0], defentries=deflib.defaults, derivative_polynomarray=[None, None, None, None], calc_norm_and_derive=None, calc_norm_on_intensity=None, skip_gui_build=False, default_dataset='Spectrum (PL-BG)', loadingfunction='PLM Spectra'):
         self.defentries = defentries
         self.remcosmicfunc = cosmicmethod
         self.removecosmics = removecosmics
@@ -294,7 +90,7 @@ class XYMap:
         
         # Load data if files provided
         if len(fnames) > 0:
-            self.load_data()
+            self.load_data(loadingfunction=loadingfunction)
         else:
             # Initialize empty structures for loading from saved state
             self.WL = []
@@ -327,9 +123,22 @@ class XYMap:
         if not skip_gui_build:
             self.build_gui()
     
-    def load_data(self):
+    def load_data(self, loadingfunction=None):
         """Load spectral data from files"""
-        self.loadfiles()
+        # old version:
+        #self.loadfiles() # todo: outsource loadfiles, so it can be paresed as loadingfunction
+
+        if loadingfunction is None:
+            print("No loading function provided. Please specify a valid loading function.")
+            return
+
+        # translate loadingfunction (which is a string from the combobox) into the actual function from deflib1.loadingfuncts
+        # new version:
+        #loadingfunction(self)  # Call the loading function with self as argument
+        if loadingfunction in loadXYspecs.loadingmethodstofunctions:
+            loadXYspecs.loadingmethodstofunctions[loadingfunction](self)  # Call the loading function with self as argument
+
+        # target: loadXYspecs
         
         # Initialize data ranges
         if len(self.WL) > 0 and len(self.specs) > 0:
@@ -2938,141 +2747,6 @@ class XYMap:
                 else:
                     PixMatrix[i][j] = np.nan
 
-    def loadfiles(self):
-        # read WL axis once for all files (must be same for all datafiles)
-        lines = ['0']
-        gotWL = False
-        gotBG = False
-        i = 0
-        self.WL = []
-        self.BG = []
-        
-        # Check if there are any files to load
-        if len(self.fnames) == 0:
-            print("No files to load. Skipping loadfiles() - will be populated by load_state().")
-            self.WL_eV = []
-            return
-        
-        while gotWL == False or gotBG == False:
-            try:
-                with open(self.fnames[i], 'r') as file:
-                    lines = file.readlines()
-            except Exception as e:
-                print('Error While trying to read WL axis. No WL found in {} Files. {}'.format(i, str(e)))
-                break
-            # Process lines to store variables
-            startreaddata = False 
-            for line in lines:
-                if '\t' in line:  # Data lines with tabs
-                    parts = line.split()
-                    if startreaddata == False:
-                        count = 0
-                        # start reading if at least two keys in the line
-                        for j in parts:
-                            if j in self.readinkeys:
-                                count += 1
-                        if count > 0:
-                            startreaddata = True
-                    elif startreaddata == True:
-                        if gotWL == False:
-                            try:
-                                self.WL.append(float(parts[0]))
-                            except Exception as e:
-                                print('Error While trying to read WL axis from {}. {}'.format(self.fnames[i], str(e)))
-                        if gotBG == False or self.loadeachbg == False:
-                            try:
-                                self.BG.append(float(parts[1]))
-                            except Exception as e:
-                                print('Error While trying to read WL axis from {}. {}'.format(self.fnames[i], str(e)))
-
-            i += 1
-            if len(self.WL) > 1:
-                gotWL = True
-            if len(self.BG) > 1:
-                gotBG = True
-        
-        if self.loadeachbg == False:
-            if self.linearbg == True:
-                av = np.mean(self.BG)
-                for i in range(len(self.BG)):
-                    self.BG[i] = av
-
-        # Convert WL and BG to float32 numpy arrays to reduce RAM usage
-        self.WL = np.array(self.WL, dtype=np.float32)
-        self.BG = np.array(self.BG, dtype=np.float32)
-
-        # convert WL in nm to eV and store as WL_eV (use copy to avoid modifying WL in-place)
-        self.WL_eV = deflib.wl_array_to_ev(self.WL.copy())
-
-        # parallel loading of spectra
-        self.parallel_load_spectra()
-        del lines
-
-    def parallel_load_spectra(self):
-        # Get memory tracker
-        mem_tracker = memory_tracker.get_default_memory_tracker()
-        
-        # Log initial state
-        mem_tracker.log_separator("LOADING SPECTRA")
-        mem_tracker.log_memory(
-            "Before loading", 
-            context="Parallel spectra loading",
-            data_info={'num_files': len(self.fnames), 'spectral_points': len(self.WL) if hasattr(self, 'WL') and len(self.WL) > 0 else 0}
-        )
-        
-        # before starting threads, clear specs
-        self.specs = []
-
-        lock = thre.Lock()  # To avoid race conditions when modifying self.specs
-
-        # Use ThreadPoolExecutor to limit concurrent threads and prevent "too many open files" error
-        # Max workers = min(32, number of CPU cores + 4) is a good default
-        max_workers = min(32, (os.cpu_count() or 4) + 4)
-        
-        # Use ThreadPoolExecutor with a limited number of workers
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            futures = [executor.submit(load_spectrum, fname, self, lock) for fname in self.fnames]
-            
-            # Track progress for large datasets
-            total = len(futures)
-            completed = 0
-            last_log_percent = 0
-            
-            # Wait for all tasks to complete
-            for future in as_completed(futures):
-                try:
-                    future.result()  # This will raise any exceptions from the worker threads
-                    completed += 1
-                    
-                    # Log progress every 10% for large datasets
-                    if total >= 1000:
-                        percent = int((completed / total) * 100)
-                        if percent >= last_log_percent + 10:
-                            mem_tracker.log_memory(
-                                f"Loading progress: {percent}%",
-                                context="Parallel spectra loading",
-                                data_info={'completed': completed, 'total': total}
-                            )
-                            last_log_percent = percent
-                            # Force garbage collection periodically for large datasets
-                            if percent % 20 == 0:
-                                gc.collect()
-                except Exception as e:
-                    print(f'Error loading spectrum: {e}')
-        
-        # Log after loading
-        mem_tracker.log_memory(
-            "After loading all spectra",
-            context="Parallel spectra loading",
-            data_info={'spectra_loaded': len(self.specs)}
-        )
-        
-        # Force garbage collection after loading
-        gc.collect()
-        
-		# after spectra are loaded, they must be put into matrix, after this, correlated cosmic ray removal can be applied (see autogenmatrix) # correlatedcosmicrayremoval
-
     def autogenmatrix(self):
         # Get memory tracker
         mem_tracker = memory_tracker.get_default_memory_tracker()
@@ -3787,7 +3461,6 @@ class XYMap:
             chunk_dict = {k: pmdict[k] for k in chunk_keys}
             pickle.dump(chunk_dict, file_handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-    
     def _load_specs_chunked(self, file_handle):
         """
         Load specs list from chunked format.
@@ -4432,24 +4105,6 @@ class XYMap:
 
     def returndisspecs(self):
         return self.disspecs
-
-def load_spectrum(fname, instance, lock):
-    specobj = SpectrumData(
-        fname,
-        instance.WL,
-        instance.BG,
-        instance.loadeachbg,
-        instance.linearbg,
-        instance.removecosmics,
-        instance.cosmicthreshold,
-        instance.cosmicpixels,
-        instance.remcosmicfunc, 
-        instance.WL_eV
-
-    )
-    if specobj.dataokay:
-        with lock:
-            instance.specs.append(specobj)
 
 def loades_spectra_derivatives(SpectrumInstance, lock):
     SpectrumInstance.calculate_derivatives()
