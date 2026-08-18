@@ -12,9 +12,10 @@ from matplotlib.path import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.patches import Rectangle
+import loadXYspecs as specloader
 
 Notebooks = ['Load Data', 'Hyperspectra', 'Clara Image', 'HSI Plot', 'Newton Spectrum', 'TCSPC', 'HSI File Sorter', 'Plot Spectra', 'Cube2Image', 'Settings', 'Marwins Specplotter']
-Loadingmethods = ['PLM Spectra']
+Loadingmethods = specloader.loadingmethods
 # dir of this file
 DIR = os.path.dirname(os.path.abspath(__file__))
 # Default values for the application
