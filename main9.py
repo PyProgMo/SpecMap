@@ -203,9 +203,37 @@ class FileProcessorApp:
         self.fileformat_entry = tk.Entry(self.open_frame)
         self.fileformat_entry.pack(fill=tk.X)
         self.fileformat_entry.insert(0, defaults['file_extension'])
-        # Process button
-        self.process_button = tk.Button(self.open_frame, text="Load HSI data", command=self.init_spec_loadfiles)
-        self.process_button.pack()
+
+
+        # start of the modular loader frame: add combobox with different Hyperspectral loading functions
+        self.loadingmethodframe = tk.Frame(self.open_frame, borderwidth=2, relief="sunken")
+
+        # Row frame containing: label, method combobox, and load button
+        self.loadingmethodrow = tk.Frame(self.loadingmethodframe)
+        self.loadingmethodrow.pack(fill="x", padx=5, pady=5)
+
+        # 1. Label
+        self.loadingmethod_label = tk.Label(self.loadingmethodrow, text="Select loading method")
+        self.loadingmethod_label.pack(side="left", padx=(0, 5))
+
+        # 2. Combobox with loading methods
+        self.loadingmethod_var = tk.StringVar()
+        self.loadingmethod_combobox = ttk.Combobox(
+            self.loadingmethodrow,
+            textvariable=self.loadingmethod_var,
+            values=["Method A", "Method B", "Method C"],  # replace with your actual method names
+            state="readonly",
+            width=20
+        )
+        self.loadingmethod_combobox.current(0)
+        self.loadingmethod_combobox.pack(side="left", padx=5)
+
+        # 3. Load button
+        self.process_button = tk.Button(self.loadingmethodrow, text="Load HSI data", command=self.init_spec_loadfiles)
+        self.process_button.pack(side="left", padx=5)
+
+        self.loadingmethodframe.pack(fill="x", padx=5, pady=5)
+
         # space between frames
         tk.Frame(self.open_frame, height=10).pack()
 
