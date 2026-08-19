@@ -24,7 +24,7 @@ import error_handler as error_handler  # Centralized error handling and logging
 import hsi_normalization as hsi_normalization  # HSI normalization module
 import memory_tracker as memory_tracker  # Memory tracking and logging
 import roihandler as roihandler 
-import loadXYspecs as loadXYspecs  # Import the loadXYspecs module for loading spectral data
+import dataloader as dataloader  # Import the dataloader module for loading spectral data
 import copy
 
 # in older versions, here Spectrum data was defined. Due to the modular loading this had to be moved to lib9.py
@@ -135,10 +135,8 @@ class XYMap:
         # translate loadingfunction (which is a string from the combobox) into the actual function from deflib1.loadingfuncts
         # new version:
         #loadingfunction(self)  # Call the loading function with self as argument
-        if loadingfunction in loadXYspecs.loadingmethodstofunctions:
-            loadXYspecs.loadingmethodstofunctions[loadingfunction](self)  # Call the loading function with self as argument
-
-        # target: loadXYspecs
+        if loadingfunction in dataloader.loadingmethodstofunctions:
+            dataloader.loadingmethodstofunctions[loadingfunction](self)  # Call the loading function with self as argument
         
         # Initialize data ranges
         if len(self.WL) > 0 and len(self.specs) > 0:
