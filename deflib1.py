@@ -1370,6 +1370,7 @@ defaults={
     'data_file': 'C:/Users/mol95ww/Desktop/Evaluation/data/VP/test7_MoS2_ML_2sec/test7_MoS2_ML_2sec',
     'filename': 'spectrum', 
     'file_extension': '.txt',
+    'loadingmethod': 'PLM Spectra',
     # Background Subtraction Frame
     'multiple_Background': False,
     'linear_Background': True,
@@ -1459,6 +1460,7 @@ defaulttypes = {
     'data_file': str,
     'filename': str,
     'file_extension': str,
+    'loadingmethod': str,
     'multiple_Background': bool,
     'linear_Background': bool,
     'default_colormap': str, 

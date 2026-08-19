@@ -208,7 +208,6 @@ class FileProcessorApp:
         self.fileformat_entry.pack(fill=tk.X)
         self.fileformat_entry.insert(0, defaults['file_extension'])
 
-
         # start of the modular loader frame: add combobox with different Hyperspectral loading functions
         self.loadingmethodframe = tk.Frame(self.open_frame, borderwidth=2, relief="sunken")
 
@@ -234,7 +233,10 @@ class FileProcessorApp:
             state="readonly",
             width=20
         )
-        self.loadingmethod_combobox.current(0)
+        if defaults['loadingmethod'] in loadingmethods:
+            self.loadingmethod_combobox.set(defaults['loadingmethod'])
+        else: 
+            self.loadingmethod_combobox.current(0)
         self.loadingmethod_combobox.pack(side="left", padx=5)
 
         # 3. Load button

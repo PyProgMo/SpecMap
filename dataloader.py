@@ -1,11 +1,13 @@
 import os, gc
+from typing import cast
 import numpy as np
-import deflib1 as deflib
 import memory_tracker as memory_tracker
 import threading as thre
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 loadingmethods = ['PLM Spectra', 'HDF5', 'ENVI', 'OME-TIFF', 'NetCDF', 'Zarr']
+import deflib1 as deflib
+import mathlib3 as matl
 # if u have different data loading methods, feel free to add them to the list here and to the dict at the bottom. Dict name is: loadingmethodstofunctions
 # I know one could just do this only with the dict (with the dict.keys()), but here it is listed one on the start. If extended do not forget to add the new method to the dict at the bottom of this file.
 
@@ -167,14 +169,210 @@ def load_spectrum(fname, instance, lock):
         with lock:
             instance.specs.append(specobj)
 
+def threaded_3D_array2SpectrumData(
+    self, array3D, wl_array=None, x_axis=None, y_axis=None, metadata=None
+):
+    """
+    Convert a hyperspectral cube to SpectrumData objects using multithreading.
+
+    The default cube layout is (Y, X, wavelength). When x_axis and y_axis
+    are supplied, the cube layout is canonical (X, Y, wavelength).
+    """
+    array3D = np.asarray(array3D)
+    if array3D.ndim != 3:
+        raise ValueError("Input array must be 3D.")
+
+    if x_axis is not None or y_axis is not None:
+        if x_axis is None or y_axis is None:
+            raise ValueError("x_axis and y_axis must be supplied together.")
+        cube = array3D
+        x_axis = np.asarray(x_axis, dtype=np.float32)
+        y_axis = np.asarray(y_axis, dtype=np.float32)
+        if cube.shape[:2] != (len(x_axis), len(y_axis)):
+            raise ValueError("X and Y axis lengths must match the cube shape.")
+        x_size, y_size, band_count = cube.shape
+    else:
+        spectral_axis = getattr(self, 'spectral_axis', -1)
+        if spectral_axis not in (-1, 0, 2):
+            raise ValueError("spectral_axis must be 0 or 2 for a 3D cube.")
+        cube = np.moveaxis(array3D, spectral_axis, -1)
+        cube = np.transpose(cube, (1, 0, 2))
+        x_size, y_size, band_count = cube.shape
+        x_axis = np.arange(x_size, dtype=np.float32)
+        y_axis = np.arange(y_size, dtype=np.float32)
+
+    wavelength = np.asarray(
+        getattr(self, 'WL', []) if wl_array is None else wl_array,
+        dtype=np.float32,
+    )
+    if wavelength.size == 0:
+        wavelength = np.arange(band_count, dtype=np.float32)
+    if wavelength.ndim != 1 or wavelength.size != band_count:
+        raise ValueError(
+            f"WL must contain one value per spectral band ({band_count}); "
+            f"got shape {wavelength.shape}."
+        )
+    self.WL = wavelength
+    self.WL_eV = deflib.wl_array_to_ev(wavelength.copy())
+    if metadata is not None:
+        self.HDF5metadata = metadata
+    background = np.asarray(getattr(self, 'BG', np.zeros(band_count)), dtype=np.float32)
+    if background.size == 0:
+        background = np.zeros(band_count, dtype=np.float32)
+    if background.ndim != 1 or background.size != band_count:
+        raise ValueError("BG must contain one value per spectral band.")
+    self.BG = background
+
+    futures = {}
+    with ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) + 4)) as executor:
+        for x in range(x_size):
+            for y in range(y_size):
+                future = executor.submit(
+                    _spectrum_data_from_array,
+                    cube[x, y, :], wavelength, background,
+                    x_axis[x], y_axis[y], self
+                )
+                futures[future] = (x, y)
+
+        ordered_specs = [None] * (x_size * y_size)
+        for future in as_completed(futures):
+            x, y = futures[future]
+            specobj = future.result()
+            if specobj.dataokay:
+                ordered_specs[x * y_size + y] = specobj
+
+    self.specs = [specobj for specobj in ordered_specs if specobj is not None]
+
+
+def _spectrum_data_from_array(values, wavelength, background, x, y, instance):
+    """Build one SpectrumData object without routing array data through a file parser."""
+    values = np.asarray(values, dtype=np.float32)
+    specobj = deflib.SpectrumData.__new__(deflib.SpectrumData)
+    specobj.removecosmicsmethod = getattr(instance, 'remcosmicfunc', 'median')
+    specobj.loadeachbg = getattr(instance, 'loadeachbg', False)
+    specobj.linearbg = getattr(instance, 'linearbg', False)
+    specobj.removecosmics = getattr(instance, 'removecosmics', False)
+    specobj.cosmicthreshold = getattr(instance, 'cosmicthreshold', 20)
+    specobj.cosmicpixels = getattr(instance, 'cosmicpixels', 3)
+    specobj.WL = wavelength
+    specobj.WL_eV = getattr(instance, 'WL_eV', None)
+    specobj.filename = f"array[{y},{x}]"
+    specobj.default_dataset = 'Spectrum (PL-BG)'
+    specobj.dataokay = True
+    specobj.data = {
+        'x-position': float(x),
+        'y-position': float(y),
+        'Delta Wavelength (nm)': float(np.mean(np.diff(wavelength))) if len(wavelength) > 1 else 0.0,
+    }
+    specobj.roistore = {}
+    specobj.PL = values + background
+    specobj.BG = background
+    specobj.PLB = values
+    specobj.Specdiff1 = None
+    specobj.Specdiff2 = None
+    specobj.dofit = False
+    specobj.fwhm = np.nan
+    specobj.fitmaxX = np.nan
+    specobj.fitmaxY = np.nan
+    specobj.fitdata = [None]
+    specobj.fitparams = matl.buildfitparas()
+    specobj.fitparamunits = matl.buildfitparas()
+    return specobj
+
 # end of the ''PLM Spectra' loading method
 # start of the 'HDF5' loading method
 def loadHDF5(self):
+    import h5py
     """
     Load HDF5 data from files and populate the XYMap object.
     """
-    # Implement HDF5 loading logic here
-    pass
+    def _decode(value):
+        if isinstance(value, bytes):
+            return value.decode()
+        if isinstance(value, np.ndarray):
+            return [_decode(item) for item in value.tolist()]
+        return value
+
+    filenames = self.fnames
+    if len(filenames) != 1:
+        raise ValueError("HDF5 loading requires exactly one input file.")
+    filepath = filenames[0]
+    requested_path = getattr(self, 'hdf5_dataset_path', None)
+
+    with h5py.File(filepath, "r") as f:
+        dataset_path = requested_path
+        if dataset_path is None and 'raw/data' in f:
+            dataset_path = 'raw/data'
+        if dataset_path is not None:
+            if dataset_path not in f:
+                raise KeyError(f"'{dataset_path}' not found in {filepath}")
+            dset = f[dataset_path]
+            if not isinstance(dset, h5py.Dataset):
+                raise ValueError(f"'{dataset_path}' is not a dataset")
+        else:
+            candidates = []
+            f.visititems(
+                lambda name, obj: candidates.append(name)
+                if isinstance(obj, h5py.Dataset) and obj.ndim == 3 else None
+            )
+            if not candidates:
+                raise ValueError(f"No 3D datasets found in {filepath}")
+            dataset_path = candidates[0]
+            dset = f[dataset_path]
+            if len(candidates) > 1:
+                print(f"Warning: multiple 3D datasets found: {candidates}. Using '{dataset_path}'.")
+
+        if not isinstance(dset, h5py.Dataset):
+            raise ValueError(f"'{dataset_path}' is not a dataset")
+        if dset.ndim != 3:
+            raise ValueError(f"'{dataset_path}' is not 3D (shape={dset.shape})")
+        array3D = dset[()]
+        attrs = {key: _decode(value) for key, value in dset.attrs.items()}
+
+        axis_order = tuple(attrs.get('axis_order', ('Y', 'X', 'Lambda')))
+        if set(axis_order) != {'X', 'Y', 'Lambda'}:
+            raise ValueError(f"Invalid axis_order in '{dataset_path}': {axis_order}")
+        permutation = [axis_order.index(label) for label in ('X', 'Y', 'Lambda')]
+        cube = np.transpose(array3D, axes=permutation)
+
+        x_path = attrs.get('x_axis_path')
+        y_path = attrs.get('y_axis_path')
+        wavelength_path = attrs.get('wavelength_path')
+        if not all((x_path, y_path, wavelength_path)):
+            x_axis = np.arange(cube.shape[0], dtype=np.float32)
+            y_axis = np.arange(cube.shape[1], dtype=np.float32)
+            wavelength = np.asarray(attrs.get('wavelength', np.arange(cube.shape[2])), dtype=np.float32)
+            metadata = attrs
+        else:
+            x_obj = f[x_path]
+            y_obj = f[y_path]
+            wavelength_obj = f[wavelength_path]
+            if not isinstance(x_obj, h5py.Dataset):
+                raise ValueError(f"'{x_path}' is not a dataset.")
+            if not isinstance(y_obj, h5py.Dataset):
+                raise ValueError(f"'{y_path}' is not a dataset.")
+            if not isinstance(wavelength_obj, h5py.Dataset):
+                raise ValueError("HDF5 axis paths must reference datasets.")
+            x_dset = cast(h5py.Dataset, x_obj)
+            y_dset = cast(h5py.Dataset, y_obj)
+            wavelength_dset = cast(h5py.Dataset, wavelength_obj)
+            x_axis = np.asarray(x_dset[()], dtype=np.float32)
+            y_axis = np.asarray(y_dset[()], dtype=np.float32)
+            wavelength = np.asarray(wavelength_dset[()], dtype=np.float32)
+            metadata = dict(attrs)
+            metadata.update({
+                'x_units': _decode(x_dset.attrs.get('units')),
+                'y_units': _decode(y_dset.attrs.get('units')),
+                'wavelength_units': _decode(wavelength_dset.attrs.get('units')),
+            })
+        metadata['dataset_path'] = dataset_path
+        metadata['axis_order'] = axis_order
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
+
 # end of the 'HDF5' loading method
 # start of the 'ENVI' loading method
 def loadENVI(self):
@@ -214,9 +412,9 @@ def loadZarr(self):
 
 loadingmethodstofunctions = {
     'PLM Spectra': loadPLMspecs, 
-    'HDF5': ,
-    'ENVI': , 
-    'OME-TIFF': , 
-    'NetCDF': ,
-    'Zarr'
+    'HDF5': loadHDF5,
+    'ENVI': loadENVI, 
+    'OME-TIFF': loadOMETIFF, 
+    'NetCDF': loadNetCDF,
+    'Zarr': loadZarr
 }
