@@ -167,14 +167,105 @@ def load_spectrum(fname, instance, lock):
         with lock:
             instance.specs.append(specobj)
 
+def threaded_3D_array2SpectrumData(self, array3D):
+    """
+    Convert a 3D NumPy array to a list of SpectrumData objects using multithreading.
+    """
+    if array3D.ndim != 3:
+        raise ValueError("Input array must be 3D.")
+    
+    num_spectra = array3D.shape[0]
+    self.specs = []
+    
+    lock = thre.Lock()  # To avoid race conditions when modifying self.specs
+    # now we can use ThreadPoolExecutor to convert each 2D slice into a SpectrumData object
+    with ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) + 4)) as executor:
+        futures = []
+        for i in range(num_spectra):
+            spectrum_slice = array3D[i, :, :]
+            futures.append(executor.submit(self.create_spectrum_data, spectrum_slice))
+        
+        for future in as_completed(futures):
+            specobj = future.result()
+            if specobj.dataokay:
+                with lock:
+                    self.specs.append(specobj)
+    
+
 # end of the ''PLM Spectra' loading method
 # start of the 'HDF5' loading method
 def loadHDF5(self):
+    import h5py
     """
     Load HDF5 data from files and populate the XYMap object.
     """
-    # Implement HDF5 loading logic here
-    pass
+    filenames = self.fnames
+    print(f"Loading HDF5 files: {filenames}")
+    filename = filenames[0]  # Assuming only one HDF5 file is used for now
+    filepath = filename
+    dataset_path = None  # You can set this to a specific dataset path if needed
+
+    #def get_3d_array(filepath, dataset_path=None):
+    """
+    Open an .h5 file and return a 3D dataset as a NumPy array.
+
+    Selection logic:
+      1. If dataset_path is given, load exactly that dataset (must be 3D).
+      2. Otherwise, scan the file for all 3D datasets.
+         - If exactly one is found, return it.
+         - If multiple are found, return the first (by HDF5 tree order)
+           and warn, listing the alternatives so you can pass an
+           explicit dataset_path next time.
+         - If none are found, raise an error.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the .h5 file.
+    dataset_path : str, optional
+        Internal HDF5 path to a specific dataset.
+
+    Returns
+    -------
+    np.ndarray
+        The 3D array (loaded fully into memory).
+    """
+    with h5py.File(filepath, "r") as f:
+
+        if dataset_path is not None:
+            if dataset_path not in f:
+                raise KeyError(f"'{dataset_path}' not found in {filepath}")
+            dset = f[dataset_path]
+            if dset.ndim != 3:
+                raise ValueError(
+                    f"'{dataset_path}' has shape {dset.shape} (ndim={dset.ndim}), expected 3D"
+                )
+            return dset[()]
+
+        # No path given -> discover all 3D datasets
+        candidates = []
+
+        def _visit(name, obj):
+            if isinstance(obj, h5py.Dataset) and obj.ndim == 3:
+                candidates.append(name)
+
+        f.visititems(_visit)
+
+        if not candidates:
+            raise ValueError(f"No 3D datasets found in {filepath}")
+
+        if len(candidates) > 1:
+            print(
+                f"Warning: multiple 3D datasets found: {candidates}. "
+                f"Using '{candidates[0]}'. Pass dataset_path= to pick a different one."
+            )
+        print(f"Loading dataset '{candidates[0]}' from {filepath}")
+        print('Loaded data shape:', f[candidates[0]].shape)
+
+        #return f[candidates[0]][()]
+    # now we can use the threaded_3D_array2SpectrumData function to convert the 3D array into SpectrumData objects
+    
+
 # end of the 'HDF5' loading method
 # start of the 'ENVI' loading method
 def loadENVI(self):
@@ -214,9 +305,9 @@ def loadZarr(self):
 
 loadingmethodstofunctions = {
     'PLM Spectra': loadPLMspecs, 
-    'HDF5': ,
-    'ENVI': , 
-    'OME-TIFF': , 
-    'NetCDF': ,
-    'Zarr'
+    'HDF5': loadHDF5,
+    'ENVI': loadENVI, 
+    'OME-TIFF': loadOMETIFF, 
+    'NetCDF': loadNetCDF,
+    'Zarr': loadZarr
 }
