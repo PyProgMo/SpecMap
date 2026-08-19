@@ -5,7 +5,11 @@ import memory_tracker as memory_tracker
 import threading as thre
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-loadingmethods = ['PLM Spectra']
+loadingmethods = ['PLM Spectra', 'HDF5', 'ENVI', 'OME-TIFF', 'NetCDF', 'Zarr']
+# if u have different data loading methods, feel free to add them to the list here and to the dict at the bottom. Dict name is: loadingmethodstofunctions
+# I know one could just do this only with the dict (with the dict.keys()), but here it is listed one on the start. If extended do not forget to add the new method to the dict at the bottom of this file.
+
+# start of the ''PLM Spectra' loading method, this one reads X*Y spectra multi-threaded
 
 def loadPLMspecs(self):
     """
@@ -163,6 +167,56 @@ def load_spectrum(fname, instance, lock):
         with lock:
             instance.specs.append(specobj)
 
+# end of the ''PLM Spectra' loading method
+# start of the 'HDF5' loading method
+def loadHDF5(self):
+    """
+    Load HDF5 data from files and populate the XYMap object.
+    """
+    # Implement HDF5 loading logic here
+    pass
+# end of the 'HDF5' loading method
+# start of the 'ENVI' loading method
+def loadENVI(self):
+    """
+    Load ENVI data from files and populate the XYMap object.
+    """
+    # Implement ENVI loading logic here
+    pass
+# end of the 'ENVI' loading method
+# start of the 'OME-TIFF' loading method
+def loadOMETIFF(self):
+    """
+    Load OME-TIFF data from files and populate the XYMap object.
+    """
+    # Implement OME-TIFF loading logic here
+    pass
+# end of the 'OME-TIFF' loading method
+# start of the 'NetCDF' loading method
+def loadNetCDF(self):
+    """
+    Load NetCDF data from files and populate the XYMap object.
+    """
+    # Implement NetCDF loading logic here
+    pass
+# end of the 'NetCDF' loading method
+# start of the 'Zarr' loading method
+def loadZarr(self):
+    """
+    Load Zarr data from files and populate the XYMap object.
+    """
+    # Implement Zarr loading logic here
+    pass
+# end of the 'Zarr' loading method
+# if u have different data loading methods, feel free to add them to the list here and to the dict at the bottom. Dict name is: loadingmethodstofunctions
+
+# last but not least, the dict that maps loading methods to their corresponding functions
+
 loadingmethodstofunctions = {
-    'PLM Spectra': loadPLMspecs
+    'PLM Spectra': loadPLMspecs, 
+    'HDF5': ,
+    'ENVI': , 
+    'OME-TIFF': , 
+    'NetCDF': ,
+    'Zarr'
 }

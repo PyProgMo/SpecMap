@@ -33,6 +33,18 @@ Frame Design:
     - Select folder with spectra for Marwinds Specplotter: load multiple spectra from .txt files for plotting in Marwinds Specplotter. Same Data as for Multiple Folders with HSI data to display the spectra of interest
 
     - See Load_Data_documentation for more details on the Load Data notebook.
+# new feature of loading: modular loading methods. 
+nextto Load Data, there is a dropdown menu to select the loading method. Currently implemented are:
+- PLM Spectra: loads the .txt files from the HSI measurement folders. This is the default loading method and the one that has been used for the development of SpecMap.
+Since the software can process any kind of 3D data:
+Planning to implement the following loading methods in the future:
+- HDF5: loads .h5 files. This is a common format for hyperspectral
+- ENVI: loads .hdr and .dat files.
+- OME-TIFF: loads .ome.tiff files. 
+- NetCDF: loads .nc files. 
+- Zarr: loads .zarr files.
+
+Due to the modular loading methods, it is possible to add new loading methods in the future. If you have a different data format, feel free to add it to the list of loading methods and implement the corresponding loading function. The loading function should be added to the dataloader.py file and added to the loadingmethodstofunctions dictionary at the bottom of the file. The loading methods are listed at the top of the dataloader.py file. If you add a new loading method, please also add it to the list at the top of the file and to the dictonary at the bottom of the file. The loading function should take the same arguments as the loadPLMspecs function and return a list of Spec objects. The dictionary then mapps the drobdown menue selection to the corresponding loading function.
 
 ### Hyperspectra
 Frame Design:
