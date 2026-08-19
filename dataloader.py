@@ -1,11 +1,12 @@
 import os, gc
 import numpy as np
-import deflib1 as deflib
 import memory_tracker as memory_tracker
 import threading as thre
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 loadingmethods = ['PLM Spectra', 'HDF5', 'ENVI', 'OME-TIFF', 'NetCDF', 'Zarr']
+import deflib1 as deflib
+import mathlib3 as matl
 # if u have different data loading methods, feel free to add them to the list here and to the dict at the bottom. Dict name is: loadingmethodstofunctions
 # I know one could just do this only with the dict (with the dict.keys()), but here it is listed one on the start. If extended do not forget to add the new method to the dict at the bottom of this file.
 
@@ -169,28 +170,92 @@ def load_spectrum(fname, instance, lock):
 
 def threaded_3D_array2SpectrumData(self, array3D):
     """
-    Convert a 3D NumPy array to a list of SpectrumData objects using multithreading.
+    Convert a hyperspectral cube to SpectrumData objects using multithreading.
+
+    The default cube layout is (Y, X, wavelength). Set spectral_axis=0 for
+    cubes stored as (wavelength, Y, X).
     """
+    array3D = np.asarray(array3D)
     if array3D.ndim != 3:
         raise ValueError("Input array must be 3D.")
-    
-    num_spectra = array3D.shape[0]
-    self.specs = []
-    
-    lock = thre.Lock()  # To avoid race conditions when modifying self.specs
-    # now we can use ThreadPoolExecutor to convert each 2D slice into a SpectrumData object
+
+    spectral_axis = getattr(self, 'spectral_axis', -1)
+    if spectral_axis not in (-1, 0, 2):
+        raise ValueError("spectral_axis must be 0 or 2 for a 3D cube.")
+    cube = np.moveaxis(array3D, spectral_axis, -1)
+    y_size, x_size, band_count = cube.shape
+
+    wavelength = np.asarray(getattr(self, 'WL', []), dtype=np.float32)
+    if wavelength.size == 0:
+        wavelength = np.arange(band_count, dtype=np.float32)
+    if wavelength.ndim != 1 or wavelength.size != band_count:
+        raise ValueError(
+            f"WL must contain one value per spectral band ({band_count}); "
+            f"got shape {wavelength.shape}."
+        )
+    self.WL = wavelength
+    self.WL_eV = deflib.wl_array_to_ev(wavelength.copy())
+    background = np.asarray(getattr(self, 'BG', np.zeros(band_count)), dtype=np.float32)
+    if background.size == 0:
+        background = np.zeros(band_count, dtype=np.float32)
+    if background.ndim != 1 or background.size != band_count:
+        raise ValueError("BG must contain one value per spectral band.")
+    self.BG = background
+
+    futures = {}
     with ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) + 4)) as executor:
-        futures = []
-        for i in range(num_spectra):
-            spectrum_slice = array3D[i, :, :]
-            futures.append(executor.submit(self.create_spectrum_data, spectrum_slice))
-        
+        for y in range(y_size):
+            for x in range(x_size):
+                future = executor.submit(
+                    _spectrum_data_from_array,
+                    cube[y, x, :], wavelength, background, x, y, self
+                )
+                futures[future] = (y, x)
+
+        ordered_specs = [None] * (y_size * x_size)
         for future in as_completed(futures):
+            y, x = futures[future]
             specobj = future.result()
             if specobj.dataokay:
-                with lock:
-                    self.specs.append(specobj)
-    
+                ordered_specs[y * x_size + x] = specobj
+
+    self.specs = [specobj for specobj in ordered_specs if specobj is not None]
+
+
+def _spectrum_data_from_array(values, wavelength, background, x, y, instance):
+    """Build one SpectrumData object without routing array data through a file parser."""
+    values = np.asarray(values, dtype=np.float32)
+    specobj = deflib.SpectrumData.__new__(deflib.SpectrumData)
+    specobj.removecosmicsmethod = getattr(instance, 'remcosmicfunc', 'median')
+    specobj.loadeachbg = getattr(instance, 'loadeachbg', False)
+    specobj.linearbg = getattr(instance, 'linearbg', False)
+    specobj.removecosmics = getattr(instance, 'removecosmics', False)
+    specobj.cosmicthreshold = getattr(instance, 'cosmicthreshold', 20)
+    specobj.cosmicpixels = getattr(instance, 'cosmicpixels', 3)
+    specobj.WL = wavelength
+    specobj.WL_eV = getattr(instance, 'WL_eV', None)
+    specobj.filename = f"array[{y},{x}]"
+    specobj.default_dataset = 'Spectrum (PL-BG)'
+    specobj.dataokay = True
+    specobj.data = {
+        'x-position': float(x),
+        'y-position': float(y),
+        'Delta Wavelength (nm)': float(np.mean(np.diff(wavelength))) if len(wavelength) > 1 else 0.0,
+    }
+    specobj.roistore = {}
+    specobj.PL = values + background
+    specobj.BG = background
+    specobj.PLB = values
+    specobj.Specdiff1 = None
+    specobj.Specdiff2 = None
+    specobj.dofit = False
+    specobj.fwhm = np.nan
+    specobj.fitmaxX = np.nan
+    specobj.fitmaxY = np.nan
+    specobj.fitdata = [None]
+    specobj.fitparams = matl.buildfitparas()
+    specobj.fitparamunits = matl.buildfitparas()
+    return specobj
 
 # end of the ''PLM Spectra' loading method
 # start of the 'HDF5' loading method
@@ -236,6 +301,8 @@ def loadHDF5(self):
             if dataset_path not in f:
                 raise KeyError(f"'{dataset_path}' not found in {filepath}")
             dset = f[dataset_path]
+            if not isinstance(dset, h5py.Dataset):
+                raise ValueError(f"'{dataset_path}' is not a dataset")
             if dset.ndim != 3:
                 raise ValueError(
                     f"'{dataset_path}' has shape {dset.shape} (ndim={dset.ndim}), expected 3D"
@@ -260,11 +327,16 @@ def loadHDF5(self):
                 f"Using '{candidates[0]}'. Pass dataset_path= to pick a different one."
             )
         print(f"Loading dataset '{candidates[0]}' from {filepath}")
-        print('Loaded data shape:', f[candidates[0]].shape)
+        dset = f[candidates[0]]
+        if not isinstance(dset, h5py.Dataset):
+            raise ValueError(f"'{candidates[0]}' is not a dataset")
+        print('Loaded data shape:', dset.shape)
 
-        #return f[candidates[0]][()]
-    # now we can use the threaded_3D_array2SpectrumData function to convert the 3D array into SpectrumData objects
-    
+        array3D = dset[()]
+
+    # HDF5 cubes use (Y, X, wavelength) by default. Set self.spectral_axis = 0
+    # before loading files stored as (wavelength, Y, X).
+    threaded_3D_array2SpectrumData(self, array3D)
 
 # end of the 'HDF5' loading method
 # start of the 'ENVI' loading method
