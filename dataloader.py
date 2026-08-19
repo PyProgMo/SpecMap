@@ -336,7 +336,7 @@ def loadHDF5(self):
 
     # HDF5 cubes use (Y, X, wavelength) by default. Set self.spectral_axis = 0
     # before loading files stored as (wavelength, Y, X).
-    threaded_3D_array2SpectrumData(self, array3D)
+    threaded_3D_array2SpectrumData(self, array3D, wl_array=np.array(dset.attrs.get('wavelength', np.arange(array3D.shape[2])), dtype=np.float32))
 
 # end of the 'HDF5' loading method
 # start of the 'ENVI' loading method
