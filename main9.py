@@ -20,7 +20,7 @@ import error_handler as error_handler  # Centralized error handling and logging
 import datetime as datet
 import plotspecs as plotspecs
 import cube2image as cube2image
-import loadXYspecs as loadXYspecs
+import dataloader as dataloader
 
 try:
     import marwin_specplot.marwin_specplot1 as marwin_specplotlib
