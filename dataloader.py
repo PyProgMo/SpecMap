@@ -1,4 +1,5 @@
 import os, gc
+from typing import cast
 import numpy as np
 import memory_tracker as memory_tracker
 import threading as thre
@@ -168,24 +169,42 @@ def load_spectrum(fname, instance, lock):
         with lock:
             instance.specs.append(specobj)
 
-def threaded_3D_array2SpectrumData(self, array3D):
+def threaded_3D_array2SpectrumData(
+    self, array3D, wl_array=None, x_axis=None, y_axis=None, metadata=None
+):
     """
     Convert a hyperspectral cube to SpectrumData objects using multithreading.
 
-    The default cube layout is (Y, X, wavelength). Set spectral_axis=0 for
-    cubes stored as (wavelength, Y, X).
+    The default cube layout is (Y, X, wavelength). When x_axis and y_axis
+    are supplied, the cube layout is canonical (X, Y, wavelength).
     """
     array3D = np.asarray(array3D)
     if array3D.ndim != 3:
         raise ValueError("Input array must be 3D.")
 
-    spectral_axis = getattr(self, 'spectral_axis', -1)
-    if spectral_axis not in (-1, 0, 2):
-        raise ValueError("spectral_axis must be 0 or 2 for a 3D cube.")
-    cube = np.moveaxis(array3D, spectral_axis, -1)
-    y_size, x_size, band_count = cube.shape
+    if x_axis is not None or y_axis is not None:
+        if x_axis is None or y_axis is None:
+            raise ValueError("x_axis and y_axis must be supplied together.")
+        cube = array3D
+        x_axis = np.asarray(x_axis, dtype=np.float32)
+        y_axis = np.asarray(y_axis, dtype=np.float32)
+        if cube.shape[:2] != (len(x_axis), len(y_axis)):
+            raise ValueError("X and Y axis lengths must match the cube shape.")
+        x_size, y_size, band_count = cube.shape
+    else:
+        spectral_axis = getattr(self, 'spectral_axis', -1)
+        if spectral_axis not in (-1, 0, 2):
+            raise ValueError("spectral_axis must be 0 or 2 for a 3D cube.")
+        cube = np.moveaxis(array3D, spectral_axis, -1)
+        cube = np.transpose(cube, (1, 0, 2))
+        x_size, y_size, band_count = cube.shape
+        x_axis = np.arange(x_size, dtype=np.float32)
+        y_axis = np.arange(y_size, dtype=np.float32)
 
-    wavelength = np.asarray(getattr(self, 'WL', []), dtype=np.float32)
+    wavelength = np.asarray(
+        getattr(self, 'WL', []) if wl_array is None else wl_array,
+        dtype=np.float32,
+    )
     if wavelength.size == 0:
         wavelength = np.arange(band_count, dtype=np.float32)
     if wavelength.ndim != 1 or wavelength.size != band_count:
@@ -195,6 +214,8 @@ def threaded_3D_array2SpectrumData(self, array3D):
         )
     self.WL = wavelength
     self.WL_eV = deflib.wl_array_to_ev(wavelength.copy())
+    if metadata is not None:
+        self.HDF5metadata = metadata
     background = np.asarray(getattr(self, 'BG', np.zeros(band_count)), dtype=np.float32)
     if background.size == 0:
         background = np.zeros(band_count, dtype=np.float32)
@@ -204,20 +225,21 @@ def threaded_3D_array2SpectrumData(self, array3D):
 
     futures = {}
     with ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) + 4)) as executor:
-        for y in range(y_size):
-            for x in range(x_size):
+        for x in range(x_size):
+            for y in range(y_size):
                 future = executor.submit(
                     _spectrum_data_from_array,
-                    cube[y, x, :], wavelength, background, x, y, self
+                    cube[x, y, :], wavelength, background,
+                    x_axis[x], y_axis[y], self
                 )
-                futures[future] = (y, x)
+                futures[future] = (x, y)
 
-        ordered_specs = [None] * (y_size * x_size)
+        ordered_specs = [None] * (x_size * y_size)
         for future in as_completed(futures):
-            y, x = futures[future]
+            x, y = futures[future]
             specobj = future.result()
             if specobj.dataokay:
-                ordered_specs[y * x_size + x] = specobj
+                ordered_specs[x * y_size + y] = specobj
 
     self.specs = [specobj for specobj in ordered_specs if specobj is not None]
 
@@ -264,79 +286,92 @@ def loadHDF5(self):
     """
     Load HDF5 data from files and populate the XYMap object.
     """
+    def _decode(value):
+        if isinstance(value, bytes):
+            return value.decode()
+        if isinstance(value, np.ndarray):
+            return [_decode(item) for item in value.tolist()]
+        return value
+
     filenames = self.fnames
-    print(f"Loading HDF5 files: {filenames}")
-    filename = filenames[0]  # Assuming only one HDF5 file is used for now
-    filepath = filename
-    dataset_path = None  # You can set this to a specific dataset path if needed
+    if len(filenames) != 1:
+        raise ValueError("HDF5 loading requires exactly one input file.")
+    filepath = filenames[0]
+    requested_path = getattr(self, 'hdf5_dataset_path', None)
 
-    #def get_3d_array(filepath, dataset_path=None):
-    """
-    Open an .h5 file and return a 3D dataset as a NumPy array.
-
-    Selection logic:
-      1. If dataset_path is given, load exactly that dataset (must be 3D).
-      2. Otherwise, scan the file for all 3D datasets.
-         - If exactly one is found, return it.
-         - If multiple are found, return the first (by HDF5 tree order)
-           and warn, listing the alternatives so you can pass an
-           explicit dataset_path next time.
-         - If none are found, raise an error.
-
-    Parameters
-    ----------
-    filepath : str
-        Path to the .h5 file.
-    dataset_path : str, optional
-        Internal HDF5 path to a specific dataset.
-
-    Returns
-    -------
-    np.ndarray
-        The 3D array (loaded fully into memory).
-    """
     with h5py.File(filepath, "r") as f:
-
+        dataset_path = requested_path
+        if dataset_path is None and 'raw/data' in f:
+            dataset_path = 'raw/data'
         if dataset_path is not None:
             if dataset_path not in f:
                 raise KeyError(f"'{dataset_path}' not found in {filepath}")
             dset = f[dataset_path]
             if not isinstance(dset, h5py.Dataset):
                 raise ValueError(f"'{dataset_path}' is not a dataset")
-            if dset.ndim != 3:
-                raise ValueError(
-                    f"'{dataset_path}' has shape {dset.shape} (ndim={dset.ndim}), expected 3D"
-                )
-            return dset[()]
-
-        # No path given -> discover all 3D datasets
-        candidates = []
-
-        def _visit(name, obj):
-            if isinstance(obj, h5py.Dataset) and obj.ndim == 3:
-                candidates.append(name)
-
-        f.visititems(_visit)
-
-        if not candidates:
-            raise ValueError(f"No 3D datasets found in {filepath}")
-
-        if len(candidates) > 1:
-            print(
-                f"Warning: multiple 3D datasets found: {candidates}. "
-                f"Using '{candidates[0]}'. Pass dataset_path= to pick a different one."
+        else:
+            candidates = []
+            f.visititems(
+                lambda name, obj: candidates.append(name)
+                if isinstance(obj, h5py.Dataset) and obj.ndim == 3 else None
             )
-        print(f"Loading dataset '{candidates[0]}' from {filepath}")
-        dset = f[candidates[0]]
+            if not candidates:
+                raise ValueError(f"No 3D datasets found in {filepath}")
+            dataset_path = candidates[0]
+            dset = f[dataset_path]
+            if len(candidates) > 1:
+                print(f"Warning: multiple 3D datasets found: {candidates}. Using '{dataset_path}'.")
+
         if not isinstance(dset, h5py.Dataset):
-            raise ValueError(f"'{candidates[0]}' is not a dataset")
-        print('Loaded data shape:', dset.shape)
-
+            raise ValueError(f"'{dataset_path}' is not a dataset")
+        if dset.ndim != 3:
+            raise ValueError(f"'{dataset_path}' is not 3D (shape={dset.shape})")
         array3D = dset[()]
+        attrs = {key: _decode(value) for key, value in dset.attrs.items()}
 
-    # HDF5 cubes use (Y, X, wavelength) by default. Set self.spectral_axis = 0
-    # before loading files stored as (wavelength, Y, X).
-    threaded_3D_array2SpectrumData(self, array3D, wl_array=np.array(dset.attrs.get('wavelength', np.arange(array3D.shape[2])), dtype=np.float32))
+        axis_order = tuple(attrs.get('axis_order', ('Y', 'X', 'Lambda')))
+        if set(axis_order) != {'X', 'Y', 'Lambda'}:
+            raise ValueError(f"Invalid axis_order in '{dataset_path}': {axis_order}")
+        permutation = [axis_order.index(label) for label in ('X', 'Y', 'Lambda')]
+        cube = np.transpose(array3D, axes=permutation)
+
+        x_path = attrs.get('x_axis_path')
+        y_path = attrs.get('y_axis_path')
+        wavelength_path = attrs.get('wavelength_path')
+        if not all((x_path, y_path, wavelength_path)):
+            x_axis = np.arange(cube.shape[0], dtype=np.float32)
+            y_axis = np.arange(cube.shape[1], dtype=np.float32)
+            wavelength = np.asarray(attrs.get('wavelength', np.arange(cube.shape[2])), dtype=np.float32)
+            metadata = attrs
+        else:
+            x_obj = f[x_path]
+            y_obj = f[y_path]
+            wavelength_obj = f[wavelength_path]
+            if not isinstance(x_obj, h5py.Dataset):
+                raise ValueError(f"'{x_path}' is not a dataset.")
+            if not isinstance(y_obj, h5py.Dataset):
+                raise ValueError(f"'{y_path}' is not a dataset.")
+            if not isinstance(wavelength_obj, h5py.Dataset):
+                raise ValueError("HDF5 axis paths must reference datasets.")
+            x_dset = cast(h5py.Dataset, x_obj)
+            y_dset = cast(h5py.Dataset, y_obj)
+            wavelength_dset = cast(h5py.Dataset, wavelength_obj)
+            x_axis = np.asarray(x_dset[()], dtype=np.float32)
+            y_axis = np.asarray(y_dset[()], dtype=np.float32)
+            wavelength = np.asarray(wavelength_dset[()], dtype=np.float32)
+            metadata = dict(attrs)
+            metadata.update({
+                'x_units': _decode(x_dset.attrs.get('units')),
+                'y_units': _decode(y_dset.attrs.get('units')),
+                'wavelength_units': _decode(wavelength_dset.attrs.get('units')),
+            })
+        metadata['dataset_path'] = dataset_path
+        metadata['axis_order'] = axis_order
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
 
 # end of the 'HDF5' loading method
 # start of the 'ENVI' loading method
