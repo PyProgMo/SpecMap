@@ -377,34 +377,335 @@ def loadHDF5(self):
 # start of the 'ENVI' loading method
 def loadENVI(self):
     """
-    Load ENVI data from files and populate the XYMap object.
+    Load ENVI (.hdr + raw binary) hyperspectral data and populate the XYMap object.
+
+    Requires the 'spectral' package (pip install spectral).
+    self.fnames should contain the .hdr header file (or any of the paired
+    .hdr/.img/.dat/.raw files — the matching .hdr will be located).
     """
-    # Implement ENVI loading logic here
-    pass
+    try:
+        import spectral
+    except ImportError as e:
+        raise ImportError(
+            "ENVI loading requires the 'spectral' package. Install it with: pip install spectral"
+        ) from e
+
+    filenames = self.fnames
+    if len(filenames) == 0:
+        raise ValueError("ENVI loading requires at least one input file.")
+
+    # Resolve the header file path (spectral needs the .hdr, not the raw data file)
+    hdr_path = None
+    for fname in filenames:
+        if fname.lower().endswith('.hdr'):
+            hdr_path = fname
+            break
+    if hdr_path is None:
+        candidate = os.path.splitext(filenames[0])[0] + '.hdr'
+        if os.path.exists(candidate):
+            hdr_path = candidate
+        else:
+            raise ValueError("Could not find an ENVI .hdr header file among the provided files.")
+
+    img = spectral.open_image(hdr_path)
+    cube_yxl = np.asarray(img.load(), dtype=np.float32)  # (rows=Y, cols=X, bands=Lambda)
+    if cube_yxl.ndim != 3:
+        raise ValueError(f"ENVI cube is not 3D (shape={cube_yxl.shape}).")
+
+    cube = np.transpose(cube_yxl, (1, 0, 2))  # -> (X, Y, Lambda)
+    x_size, y_size, band_count = cube.shape
+
+    # Wavelength axis, if present in the header metadata
+    bands = getattr(img, 'bands', None)
+    if bands is not None and getattr(bands, 'centers', None):
+        wavelength = np.array(bands.centers, dtype=np.float32)
+    else:
+        wavelength = np.arange(band_count, dtype=np.float32)
+
+    # Pixel size from ENVI 'map info' field, if present, else fall back to index spacing
+    img_metadata = getattr(img, 'metadata', {}) or {}
+    map_info = img_metadata.get('map info')
+    pixel_size_x = pixel_size_y = 1.0
+    if map_info is not None and len(map_info) >= 7:
+        try:
+            pixel_size_x = float(map_info[5])
+            pixel_size_y = float(map_info[6])
+        except (ValueError, IndexError):
+            pass
+    x_axis = np.arange(x_size, dtype=np.float32) * pixel_size_x
+    y_axis = np.arange(y_size, dtype=np.float32) * pixel_size_y
+
+    metadata = dict(img_metadata)
+    metadata['source_format'] = 'ENVI'
+    metadata['hdr_path'] = hdr_path
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
 # end of the 'ENVI' loading method
 # start of the 'OME-TIFF' loading method
 def loadOMETIFF(self):
     """
-    Load OME-TIFF data from files and populate the XYMap object.
+    Load an OME-TIFF hyperspectral/multi-channel stack and populate the XYMap object.
+
+    Requires the 'tifffile' package (pip install tifffile). Channel axis 'C'
+    is treated as the spectral (Lambda) axis; singleton T/Z axes are squeezed out.
     """
-    # Implement OME-TIFF loading logic here
-    pass
+    try:
+        import tifffile
+    except ImportError as e:
+        raise ImportError(
+            "OME-TIFF loading requires the 'tifffile' package. Install it with: pip install tifffile"
+        ) from e
+
+    filenames = self.fnames
+    if len(filenames) != 1:
+        raise ValueError("OME-TIFF loading requires exactly one input file.")
+    filepath = filenames[0]
+
+    with tifffile.TiffFile(filepath) as tif:
+        array = np.asarray(tif.asarray())
+        axes = tif.series[0].axes if tif.series else None  # e.g. 'TCZYX', 'CYX', 'ZYX'
+        ome_xml = tif.ome_metadata
+
+    # Reduce to 3D by squeezing out singleton T/Z axes
+    remaining_axes = axes
+    if axes is not None:
+        squeeze_axes = tuple(
+            i for i, ax in enumerate(axes) if ax in ('T', 'Z') and array.shape[i] == 1
+        )
+        if squeeze_axes:
+            array = np.squeeze(array, axis=squeeze_axes)
+        remaining_axes = ''.join(ax for i, ax in enumerate(axes) if i not in squeeze_axes)
+
+    if array.ndim != 3:
+        raise ValueError(
+            f"OME-TIFF data is not reducible to 3D after squeezing singleton axes "
+            f"(shape={array.shape}, axes={remaining_axes})."
+        )
+
+    # Determine axis order: prefer explicit axes string, else assume (C, Y, X)
+    if remaining_axes and set(remaining_axes) == {'C', 'Y', 'X'}:
+        order = [remaining_axes.index(ax) for ax in ('C', 'Y', 'X')]
+        cyx = np.transpose(array, order)
+    else:
+        cyx = array  # assume already (C, Y, X)
+
+    band_count, y_size, x_size = cyx.shape
+    cube = np.transpose(cyx, (2, 1, 0))  # -> (X, Y, Lambda/C)
+
+    # Try to pull channel wavelengths and pixel size from the OME-XML metadata
+    wavelength = np.arange(band_count, dtype=np.float32)
+    pixel_size_x = pixel_size_y = 1.0
+    metadata = {'source_format': 'OME-TIFF'}
+    if ome_xml:
+        try:
+            ome_dict = tifffile.xml2dict(ome_xml)
+            image_node = ome_dict.get('OME', {}).get('Image', {})
+            if isinstance(image_node, list):
+                image_node = image_node[0]
+            pixels = image_node.get('Pixels', {})
+            channels = pixels.get('Channel', [])
+            if isinstance(channels, dict):
+                channels = [channels]
+            centers = [
+                float(ch['EmissionWavelength']) for ch in channels
+                if isinstance(ch, dict) and 'EmissionWavelength' in ch
+            ]
+            if len(centers) == band_count:
+                wavelength = np.array(centers, dtype=np.float32)
+            pixel_size_x = float(pixels.get('PhysicalSizeX', 1.0))
+            pixel_size_y = float(pixels.get('PhysicalSizeY', 1.0))
+            metadata['ome_pixels'] = pixels
+        except Exception as e:
+            print(f"Warning: could not fully parse OME-XML metadata: {e}")
+
+    x_axis = np.arange(x_size, dtype=np.float32) * pixel_size_x
+    y_axis = np.arange(y_size, dtype=np.float32) * pixel_size_y
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
 # end of the 'OME-TIFF' loading method
 # start of the 'NetCDF' loading method
 def loadNetCDF(self):
     """
-    Load NetCDF data from files and populate the XYMap object.
+    Load a NetCDF hyperspectral cube and populate the XYMap object.
+
+    Requires 'xarray' (and a NetCDF backend such as 'netCDF4').
+    Install with: pip install xarray netCDF4
+
+    Looks for a 3D data variable (set self.netcdf_variable to pick one
+    explicitly). Dimensions are matched to X/Y/Lambda by name where
+    possible, falling back to positional (Y, X, Lambda) order otherwise.
     """
-    # Implement NetCDF loading logic here
-    pass
+    try:
+        import xarray as xr
+    except ImportError as e:
+        raise ImportError(
+            "NetCDF loading requires 'xarray' (and 'netCDF4'). Install with: pip install xarray netCDF4"
+        ) from e
+
+    filenames = self.fnames
+    if len(filenames) != 1:
+        raise ValueError("NetCDF loading requires exactly one input file.")
+    filepath = filenames[0]
+
+    requested_var = getattr(self, 'netcdf_variable', None)
+
+    with xr.open_dataset(filepath) as ds:
+        if requested_var is not None:
+            if requested_var not in ds.data_vars:
+                raise KeyError(f"'{requested_var}' not found in {filepath}")
+            var_name = requested_var
+        else:
+            candidates = [name for name, da in ds.data_vars.items() if da.ndim == 3]
+            if not candidates:
+                raise ValueError(f"No 3D data variables found in {filepath}")
+            var_name = candidates[0]
+            if len(candidates) > 1:
+                print(f"Warning: multiple 3D variables found: {candidates}. Using '{var_name}'.")
+
+        da = ds[var_name]
+        dims = list(da.dims)
+
+        def _find_dim(*keywords):
+            for dim in dims:
+                if any(kw in dim.lower() for kw in keywords):
+                    return dim
+            return None
+
+        x_dim = _find_dim('x', 'col')
+        y_dim = _find_dim('y', 'row')
+        lambda_dim = _find_dim('wavelength', 'lambda', 'band', 'wl', 'spectral')
+
+        if not (x_dim and y_dim and lambda_dim) or len({x_dim, y_dim, lambda_dim}) != 3:
+            if len(dims) != 3:
+                raise ValueError(f"Could not resolve axis roles from dims {dims}.")
+            # fall back to positional assumption: (Y, X, Lambda)
+            y_dim, x_dim, lambda_dim = dims
+
+        array = da.transpose(x_dim, y_dim, lambda_dim).values
+        cube = np.asarray(array, dtype=np.float32)
+
+        def _axis_values(dim):
+            if dim in ds.coords:
+                return np.asarray(ds.coords[dim].values, dtype=np.float32)
+            return np.arange(da.sizes[dim], dtype=np.float32)
+
+        x_axis = _axis_values(x_dim)
+        y_axis = _axis_values(y_dim)
+        wavelength = _axis_values(lambda_dim)
+
+        metadata = dict(da.attrs)
+        metadata['source_format'] = 'NetCDF'
+        metadata['variable'] = var_name
+        metadata['dims'] = {'x': x_dim, 'y': y_dim, 'lambda': lambda_dim}
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
 # end of the 'NetCDF' loading method
 # start of the 'Zarr' loading method
 def loadZarr(self):
     """
-    Load Zarr data from files and populate the XYMap object.
+    Load a Zarr store and populate the XYMap object.
+
+    Requires the 'zarr' package (pip install zarr). Follows the same
+    axis_order / x_axis_path / y_axis_path / wavelength_path attribute
+    convention documented in h5_format_spec.md for the project's HDF5
+    format — a Zarr store written with that layout (array attrs instead
+    of h5py dataset attrs) will load with no extra configuration.
     """
-    # Implement Zarr loading logic here
-    pass
+    try:
+        import zarr
+    except ImportError as e:
+        raise ImportError(
+            "Zarr loading requires the 'zarr' package. Install it with: pip install zarr"
+        ) from e
+
+    def _decode(value):
+        if isinstance(value, bytes):
+            return value.decode()
+        if isinstance(value, (list, tuple)):
+            return [_decode(item) for item in value]
+        return value
+
+    filenames = self.fnames
+    if len(filenames) != 1:
+        raise ValueError("Zarr loading requires exactly one input path (a .zarr store/directory).")
+    filepath = filenames[0]
+    requested_path = getattr(self, 'zarr_dataset_path', None)
+
+    root = zarr.open(filepath, mode='r')
+
+    dataset_path = requested_path
+    if dataset_path is None and 'raw/data' in root:
+        dataset_path = 'raw/data'
+
+    if dataset_path is not None:
+        if dataset_path not in root:
+            raise KeyError(f"'{dataset_path}' not found in {filepath}")
+        arr = root[dataset_path]
+    else:
+        candidates = []
+
+        def _visit(name, obj):
+            if hasattr(obj, 'ndim') and obj.ndim == 3:
+                candidates.append(name)
+
+        root.visititems(_visit)
+        if not candidates:
+            raise ValueError(f"No 3D arrays found in {filepath}")
+        dataset_path = candidates[0]
+        arr = root[dataset_path]
+        if len(candidates) > 1:
+            print(f"Warning: multiple 3D arrays found: {candidates}. Using '{dataset_path}'.")
+
+    if arr.ndim != 3:
+        raise ValueError(f"'{dataset_path}' is not 3D (shape={arr.shape})")
+
+    array3D = np.asarray(arr[:])
+    attrs = {key: _decode(value) for key, value in dict(arr.attrs).items()}
+
+    axis_order = tuple(attrs.get('axis_order', ('Y', 'X', 'Lambda')))
+    if set(axis_order) != {'X', 'Y', 'Lambda'}:
+        raise ValueError(f"Invalid axis_order in '{dataset_path}': {axis_order}")
+    permutation = [axis_order.index(label) for label in ('X', 'Y', 'Lambda')]
+    cube = np.transpose(array3D, axes=permutation)
+
+    x_path = attrs.get('x_axis_path')
+    y_path = attrs.get('y_axis_path')
+    wavelength_path = attrs.get('wavelength_path')
+    if not all((x_path, y_path, wavelength_path)):
+        x_axis = np.arange(cube.shape[0], dtype=np.float32)
+        y_axis = np.arange(cube.shape[1], dtype=np.float32)
+        wavelength = np.asarray(attrs.get('wavelength', np.arange(cube.shape[2])), dtype=np.float32)
+        metadata = attrs
+    else:
+        x_arr = root[x_path]
+        y_arr = root[y_path]
+        wl_arr = root[wavelength_path]
+        x_axis = np.asarray(x_arr[:], dtype=np.float32)
+        y_axis = np.asarray(y_arr[:], dtype=np.float32)
+        wavelength = np.asarray(wl_arr[:], dtype=np.float32)
+        metadata = dict(attrs)
+        metadata.update({
+            'x_units': _decode(dict(x_arr.attrs).get('units')),
+            'y_units': _decode(dict(y_arr.attrs).get('units')),
+            'wavelength_units': _decode(dict(wl_arr.attrs).get('units')),
+        })
+    metadata['dataset_path'] = dataset_path
+    metadata['axis_order'] = axis_order
+    metadata['source_format'] = 'Zarr'
+
+    threaded_3D_array2SpectrumData(
+        self, cube, wl_array=wavelength, x_axis=x_axis, y_axis=y_axis,
+        metadata=metadata
+    )
 # end of the 'Zarr' loading method
 # if u have different data loading methods, feel free to add them to the list here and to the dict at the bottom. Dict name is: loadingmethodstofunctions
 

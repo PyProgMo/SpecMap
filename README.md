@@ -46,13 +46,18 @@ The program requires the following Python packages (see `requirements.txt`):
 - `PIL/Pillow` (image processing)
 - `pandas` (data manipulation)
 
-### Setup
-!!! .venv Installation START !!!
-- Installation an .venv creation on windows enter the following 5 command in your terminal:
->>> Remove-Item -Recurse -Force .venv
-
-1. Ensure all required packages are installed: `pip install -r requirements.txt`
-2. Run the main application: `python main9.py`
+### Setup guide for beginners
+1. Clone the repository: `git clone [repository-url]`
+2. create venv (windows cmd):
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+3. make sure u are in the project directory and make sure all required packets are installed. Therefore run:
+   ```
+   pip install -r requirements.txt
+   ```
+4. Run the main application: `python main9.py`
 
 ### Hyperspectral Standard Interface (Optional)
 SpecMap includes a Jupyter notebook for interfacing with industry-standard hyperspectral libraries:
